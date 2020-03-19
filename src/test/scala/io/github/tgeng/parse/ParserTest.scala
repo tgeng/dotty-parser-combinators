@@ -219,30 +219,30 @@ class ParserTest {
 
   @Test
   def `apply operator` = {
-    val spaces = ' '*
+    val spaces = parser(' ')*
     val number = ("[0-9]+".r << spaces).map(_.toInt) withName "number"
-    testing(pure((a: Int, b: Int) => a + b, "Sum2") $ (number, number)) {
+    testing(pure((a: Int, b: Int) => a + b, "Sum2") <*> (number, number)) {
       "12 34" ~> 46
       "12 ab" ~^ """
         3: /[0-9]+/
         3: number := /[0-9]+/ << ' '*
-        0: Sum2 $ (number, number)
+        0: Sum2 <*> (number, number)
       """
     }
-    testing(pure((a: Int, b: Int, c: Int) => a + b + c, "Sum3") $ (number, number, number)) {
+    testing(pure((a: Int, b: Int, c: Int) => a + b + c, "Sum3") <*> (number, number, number)) {
       "12 34 56" ~> 102
       "12 34" ~^ """
         5: /[0-9]+/
         5: number := /[0-9]+/ << ' '*
-        0: Sum3 $ (number, number, number)
+        0: Sum3 <*> (number, number, number)
       """
     }
-    testing(pure((a: Int, b: Int, c: Int, d: Int) => a + b + c + d, "Sum4") $ (number, number, number, number)) {
+    testing(pure((a: Int, b: Int, c: Int, d: Int) => a + b + c + d, "Sum4") <*> (number, number, number, number)) {
     "12 34 56 78" ~> 180
     "12 34 56 " ~^ """
       9: /[0-9]+/
       9: number := /[0-9]+/ << ' '*
-      0: Sum4 $ (number, number, number, number)
+      0: Sum4 <*> (number, number, number, number)
     """
     }
   }
@@ -324,7 +324,7 @@ class ParserTest {
 
   @Test
   def `calculator` = {
-    val spaces = ' '*
+    val spaces = parser(' ')*
     val plus = ('+'!) as ((a: Double, b: Double) => a + b) withName "+"
     val minus = ('-'!) as ((a: Double, b: Double) => a - b) withName "-"
     val multiply = ('*'!) as ((a: Double, b: Double) => a * b) withName "*"

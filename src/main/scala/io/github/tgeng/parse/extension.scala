@@ -111,16 +111,16 @@ def foldRight[I, L, R](elemParser: ParserT[I, L], opParser: ParserT[I, (L, R) =>
 
 def applyKind = Kind(10, "apply")
 
-def [I, F, T](fnP: ParserT[I, F => T]) $(
+def [I, F, T](fnP: ParserT[I, F => T])<*>(
   fP: => ParserT[I, F]
   ) : ParserT[I, T] = (for {
   fn <- fnP
   f <- fP
 } yield fn(f)) withDetailAndKind(
-  s"${fnP.name(applyKind)} $$ (${fP.name()})",
+  s"${fnP.name(applyKind)} <*> (${fP.name()})",
   applyKind)
 
-def [I, F1, F2, T](fnP: ParserT[I, (F1, F2) => T]) $ (
+def [I, F1, F2, T](fnP: ParserT[I, (F1, F2) => T])<*>(
   f1P: => ParserT[I, F1],
   f2P: => ParserT[I, F2],
   ) : ParserT[I, T] = (for {
@@ -128,10 +128,10 @@ def [I, F1, F2, T](fnP: ParserT[I, (F1, F2) => T]) $ (
   f1 <- f1P
   f2 <- f2P
 } yield fn(f1, f2)) withDetailAndKind (
-  s"${fnP.name(applyKind)} $$ (${f1P.name()}, ${f2P.name()})",
+  s"${fnP.name(applyKind)} <*> (${f1P.name()}, ${f2P.name()})",
   applyKind)
 
-def [I, F1, F2, F3, T](fnP: ParserT[I, (F1, F2, F3) => T]) $ (
+def [I, F1, F2, F3, T](fnP: ParserT[I, (F1, F2, F3) => T])<*>(
   f1P: => ParserT[I, F1],
   f2P: => ParserT[I, F2],
   f3P: => ParserT[I, F3],
@@ -141,10 +141,10 @@ def [I, F1, F2, F3, T](fnP: ParserT[I, (F1, F2, F3) => T]) $ (
   f2 <- f2P
   f3 <- f3P
 } yield fn(f1, f2, f3)) withDetailAndKind (
-  s"${fnP.name(applyKind)} $$ (${f1P.name()}, ${f2P.name()}, ${f3P.name()})",
+  s"${fnP.name(applyKind)} <*> (${f1P.name()}, ${f2P.name()}, ${f3P.name()})",
   applyKind)
 
-def [I, F1, F2, F3, F4, T](fnP: ParserT[I, (F1, F2, F3, F4) => T]) $ (
+def [I, F1, F2, F3, F4, T](fnP: ParserT[I, (F1, F2, F3, F4) => T])<*>(
   f1P: => ParserT[I, F1],
   f2P: => ParserT[I, F2],
   f3P: => ParserT[I, F3],
@@ -156,7 +156,7 @@ def [I, F1, F2, F3, F4, T](fnP: ParserT[I, (F1, F2, F3, F4) => T]) $ (
   f3 <- f3P
   f4 <- f4P
 } yield fn(f1, f2, f3, f4)) withDetailAndKind (
-  s"${fnP.name(applyKind)} $$ (${f1P.name()}, ${f2P.name()}, ${f3P.name()}, ${f4P.name()})",
+  s"${fnP.name(applyKind)} <*> (${f1P.name()}, ${f2P.name()}, ${f3P.name()}, ${f4P.name()})",
   applyKind)
 
 val prependAppendConcat = Kind(7, "prependAppendConcat")
