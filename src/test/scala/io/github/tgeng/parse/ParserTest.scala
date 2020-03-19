@@ -11,7 +11,7 @@ class ParserTest {
   @Test
   def `basic parsers` = {
     testing(pure(())) {
-      "" ~>(())
+      "" ~> (())
     }
     testing(pure((1))) {
       "" ~> 1
@@ -20,19 +20,19 @@ class ParserTest {
       "" ~> 0
     }
     testing(empty) {
-      "" ~>(())
-      "abc" ~>(())
+      "" ~> (())
+      "abc" ~> (())
     }
     testing(any) {
       "abc" ~> 'a'
       "" ~^ "0: <any>"
     }
     testing(eof) {
-      "" ~>(())
+      "" ~> (())
       "abc" ~^ "0: <eof>"
     }
     testing(skip) {
-      "abc" ~>(())
+      "abc" ~> (())
       "" ~^ "0: <skip>"
     }
 
@@ -219,7 +219,7 @@ class ParserTest {
 
   @Test
   def `apply operator` = {
-    val spaces = parser(' ')*
+    val spaces = ' '*
     val number = ("[0-9]+".r << spaces).map(_.toInt) withName "number"
     testing(pure((a: Int, b: Int) => a + b, "Sum2") $ (number, number)) {
       "12 34" ~> 46
@@ -279,7 +279,7 @@ class ParserTest {
         0: 'a' +:+ 'b'
       """
     }
-    val ab = parser(a +:+ b)
+    val ab = a +:+ b
     testing(c +: ab) {
       "cab".~>[Char, IndexedSeq[Char]]("cab")
       "ab" ~^ """
@@ -324,11 +324,11 @@ class ParserTest {
 
   @Test
   def `calculator` = {
-    val spaces = parser(' ')*
-    val plus = parser('+'!) as ((a: Double, b: Double) => a + b) withName "+"
-    val minus = parser('-'!) as ((a: Double, b: Double) => a - b) withName "-"
-    val multiply = parser('*'!) as ((a: Double, b: Double) => a * b) withName "*"
-    val divide = parser('/'!) as ((a: Double, b: Double) => a / b) withName "/"
+    val spaces = ' '*
+    val plus = ('+'!) as ((a: Double, b: Double) => a + b) withName "+"
+    val minus = ('-'!) as ((a: Double, b: Double) => a - b) withName "-"
+    val multiply = ('*'!) as ((a: Double, b: Double) => a * b) withName "*"
+    val divide = ('/'!) as ((a: Double, b: Double) => a / b) withName "/"
 
     def sumExpr: Parser[Double] =
       prodExpr.chainedLeftBy(spaces >> (plus | minus) << spaces) withName "sumExpr"
