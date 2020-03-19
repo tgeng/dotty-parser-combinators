@@ -1,7 +1,6 @@
 package io.github.tgeng.parse
 
 import scala.collection.IndexedSeq
-import scala.collection.immutable
 import scala.collection.mutable.ArrayBuffer
 
 class Kind(val precedence: Double, val name: String)
@@ -224,11 +223,11 @@ def [I, T](p: ParserT[I, T]) & (cond: ParserT[I, Any]): ParserT[I, T] = new Pars
   }
 }
 
-def [I, T](p: ParserT[I, T])* = new ParserT[I, immutable.IndexedSeq[T]](){
+def [I, T](p: ParserT[I, T])* = new ParserT[I, Vector[T]](){
   private val starKind = Kind(9, "*")
   override def kind : Kind = starKind
   override def detailImpl = p.name(kind) + "*"
-  override def parseImpl(input: ParserState[I]) : Either[ParserError[I], immutable.IndexedSeq[T]] = {
+  override def parseImpl(input: ParserState[I]) : Either[ParserError[I], Vector[T]] = {
     val result = ArrayBuffer[T]()
     while(true) {
       val startPosition = input.position
@@ -236,7 +235,7 @@ def [I, T](p: ParserT[I, T])* = new ParserT[I, immutable.IndexedSeq[T]](){
         case Right(t) => result += t
         case Left(e) if (startPosition >= input.commitPosition) => {
           input.position = startPosition
-          return Right(result.toIndexedSeq)
+          return Right(result.toVector)
         }
         case Left(e) => return Left(e)
       }
@@ -245,11 +244,11 @@ def [I, T](p: ParserT[I, T])* = new ParserT[I, immutable.IndexedSeq[T]](){
   }
 }
 
-def [I, T](count: Int) *(p: ParserT[I, T]) = new ParserT[I, immutable.IndexedSeq[T]] {
+def [I, T](count: Int) *(p: ParserT[I, T]) = new ParserT[I, Vector[T]] {
   private val repeatKind = Kind(8, "n*_")
   override def kind : Kind = repeatKind
   override def detailImpl = s"$count * " + p.name(kind)
-  override def parseImpl(input: ParserState[I]) : Either[ParserError[I], immutable.IndexedSeq[T]] = {
+  override def parseImpl(input: ParserState[I]) : Either[ParserError[I], Vector[T]] = {
     val position = input.position;
     val result = new ArrayBuffer[T](count)
     var i = 0
@@ -260,7 +259,7 @@ def [I, T](count: Int) *(p: ParserT[I, T]) = new ParserT[I, immutable.IndexedSeq
         case Left(e) => return Left(ParserError(position, this, e))
       }
     }
-    Right(result.toIndexedSeq)
+    Right(result.toVector)
   }
 }
 
