@@ -1,5 +1,7 @@
 package io.github.tgeng.parse
 
+import scala.collection.IndexedSeq
+import scala.collection.immutable
 import scala.collection.mutable.ArrayBuffer
 
 class Kind(val precedence: Double, val name: String)
@@ -58,7 +60,7 @@ case class ParserError[-I](
     }
   }
 
-  inline def ParserT[I, T](p: ParserT[I, T]) = p
+  inline def parser[I, T](p: ParserT[I, T]) = p
 
   def [I, T, R](p: ParserT[I, T]) map(f: T => R): ParserT[I, R] = {
     new ParserT[I, R] {
@@ -222,11 +224,11 @@ def [I, T](p: ParserT[I, T]) & (cond: ParserT[I, Any]): ParserT[I, T] = new Pars
   }
 }
 
-def [I, T](p: ParserT[I, T])* = new ParserT[I, IndexedSeq[T]](){
+def [I, T](p: ParserT[I, T])* = new ParserT[I, immutable.IndexedSeq[T]](){
   private val starKind = Kind(9, "*")
   override def kind : Kind = starKind
   override def detailImpl = p.name(kind) + "*"
-  override def parseImpl(input: ParserState[I]) : Either[ParserError[I], IndexedSeq[T]] = {
+  override def parseImpl(input: ParserState[I]) : Either[ParserError[I], immutable.IndexedSeq[T]] = {
     val result = ArrayBuffer[T]()
     while(true) {
       val startPosition = input.position
@@ -243,11 +245,11 @@ def [I, T](p: ParserT[I, T])* = new ParserT[I, IndexedSeq[T]](){
   }
 }
 
-def [I, T](count: Int) *(p: ParserT[I, T]) = new ParserT[I, IndexedSeq[T]] {
+def [I, T](count: Int) *(p: ParserT[I, T]) = new ParserT[I, immutable.IndexedSeq[T]] {
   private val repeatKind = Kind(8, "n*_")
-  override def kind : Kind = Kind(8, "n*_")
+  override def kind : Kind = repeatKind
   override def detailImpl = s"$count * " + p.name(kind)
-  override def parseImpl(input: ParserState[I]) : Either[ParserError[I], IndexedSeq[T]] = {
+  override def parseImpl(input: ParserState[I]) : Either[ParserError[I], immutable.IndexedSeq[T]] = {
     val position = input.position;
     val result = new ArrayBuffer[T](count)
     var i = 0

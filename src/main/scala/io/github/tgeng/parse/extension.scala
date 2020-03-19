@@ -1,5 +1,8 @@
 package io.github.tgeng.parse
 
+import scala.collection.immutable
+import scala.collection.IndexedSeq
+
 def [I, R](p: ParserT[I, ?]) as(r: R) : ParserT[I, R] = p.map(_ => r)
 
 val empty: ParserT[Any, Unit] = pure(()) withStrongName "<empty>"
@@ -24,7 +27,7 @@ def [I, T](p1: ParserT[I, T]) << (p2: ParserT[I, ?]) : ParserT[I, T] = (for {
   p1.name(prefixSuffixKind) + " << " + p2.name(prefixSuffixKind),
   prefixSuffixKind)
 
-def [I, T](p: ParserT[I, T])+ : ParserT[I, IndexedSeq[T]] = {
+def [I, T](p: ParserT[I, T])+ : ParserT[I, immutable.IndexedSeq[T]] = {
   val kind = Kind(9, "+")
   (for {
   t <- p
@@ -33,32 +36,32 @@ def [I, T](p: ParserT[I, T])+ : ParserT[I, IndexedSeq[T]] = {
 }
 
 def [I, T](p: ParserT[I, T])? : ParserT[I, Option[T]] = {
-  val kind = Kind(0, "?")
+  val kind = Kind(9, "?")
   (p.map(Some[T]) | (empty as None)) withDetailAndKind(
     p.name(kind) + "?",
     kind
   )
 }
 
-def [I, T](p: ParserT[I, T]) sepBy1 (s: ParserT[I, ?]) : ParserT[I, IndexedSeq[T]] = {
+def [I, T](p: ParserT[I, T]) sepBy1 (s: ParserT[I, ?]) : ParserT[I, immutable.IndexedSeq[T]] = {
   val sepKind = Kind(0, "sepBy1")
   p +: ((s >> p)*) withDetailAndKind (
   s"${p.name(sepKind)} sepBy1 ${s.name(sepKind)}",
   sepKind)
 }
 
-def [I, T](p: ParserT[I, T]) sepBy (s: ParserT[I, ?]) : ParserT[I, IndexedSeq[T]] = {
+def [I, T](p: ParserT[I, T]) sepBy (s: ParserT[I, ?]) : ParserT[I, immutable.IndexedSeq[T]] = {
   val sepKind = Kind(0, "sepBy")
-  (p.sepBy1(s) | (empty as IndexedSeq.empty)) withDetailAndKind (
+  (p.sepBy1(s) | (empty as immutable.IndexedSeq.empty)) withDetailAndKind (
   s"${p.name(sepKind)} sepBy ${s.name(sepKind)}",
   sepKind)
 }
 
-def [I, T](p: ParserT[I, T]) sepByN (count: Int) (s: ParserT[I, ?]) : ParserT[I, IndexedSeq[T]] = {
+def [I, T](p: ParserT[I, T]) sepByN (count: Int) (s: ParserT[I, ?]) : ParserT[I, immutable.IndexedSeq[T]] = {
   val sepKind = Kind(0, "sepByN")
   count match {
-    case 0 => empty as IndexedSeq.empty[T]
-    case 1 => p.map(IndexedSeq[T](_))
+    case 0 => empty as immutable.IndexedSeq.empty[T]
+    case 1 => p.map(immutable.IndexedSeq[T](_))
     case n => p +: (n - 1) * (s >> p)
   } withDetailAndKind (
     s"${p.name(sepKind)} sepByN($count) ${s.name(sepKind)}",
@@ -159,28 +162,28 @@ def [I, F1, F2, F3, F4, T](fnP: ParserT[I, (F1, F2, F3, F4) => T]) $ (
 
 val prependAppendConcat = Kind(7, "prependAppendConcat")
 
-def [I, T](p1: ParserT[I, T]) +:+ (p2: ParserT[I, T]) : ParserT[I, IndexedSeq[T]] = (for {
+def [I, T](p1: ParserT[I, T]) +:+ (p2: ParserT[I, T]) : ParserT[I, immutable.IndexedSeq[T]] = (for {
   t1 <- p1
   t2 <- p2
-} yield IndexedSeq(t1, t2)).withDetailAndKind(
+} yield immutable.IndexedSeq(t1, t2)).withDetailAndKind(
   s"${p1.name(prependAppendConcat)} +:+ ${p2.name(prependAppendConcat)}",
   prependAppendConcat)
 
-def [I, T, S <: IndexedSeq[T]](p1: ParserT[I, T]) +: (p2: ParserT[I, IndexedSeq[T]]) : ParserT[I, IndexedSeq[T]] = (for {
+def [I, T](p1: ParserT[I, T]) +: (p2: ParserT[I, immutable.IndexedSeq[T]]) : ParserT[I, immutable.IndexedSeq[T]] = (for {
   t <- p1
   ts <- p2
 } yield t +: ts).withDetailAndKind(
   s"${p1.name(prependAppendConcat)} +: ${p2.name(prependAppendConcat)}",
   prependAppendConcat)
 
-def [I, T](p1: ParserT[I, IndexedSeq[T]]) :+ (p2: ParserT[I, T]) : ParserT[I, IndexedSeq[T]] = (for {
+def [I, T](p1: ParserT[I, immutable.IndexedSeq[T]]) :+ (p2: ParserT[I, T]) : ParserT[I, immutable.IndexedSeq[T]] = (for {
   ts <- p1
   t <- p2
 } yield ts :+ t).withDetailAndKind(
   s"${p1.name(prependAppendConcat)} :+ ${p2.name(prependAppendConcat)}",
   prependAppendConcat)
 
-def [I, T](p1: ParserT[I, IndexedSeq[T]]) ++ (p2: ParserT[I, IndexedSeq[T]]) : ParserT[I, IndexedSeq[T]] = (for {
+def [I, T](p1: ParserT[I, immutable.IndexedSeq[T]]) ++ (p2: ParserT[I, immutable.IndexedSeq[T]]) : ParserT[I, immutable.IndexedSeq[T]] = (for {
   ts1 <- p1
   ts2 <- p2
 } yield ts1 ++ ts2).withDetailAndKind(
