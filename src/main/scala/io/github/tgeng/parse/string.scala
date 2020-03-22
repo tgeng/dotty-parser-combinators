@@ -9,7 +9,7 @@ object string {
 
   private val regexKind = Kind(10, "regex")
 
-  given parserMatchingRegex : Conversion[Regex, Parser[String]] = (r: Regex) => new Parser[String] {
+  given parserMatchingRegex as Conversion[Regex, Parser[String]] = (r: Regex) => new Parser[String] {
     override def kind : Kind = regexKind
     override def detailImpl = s"/$r/"
     override def parseImpl(input: ParserState[Char]) : Either[ParserError[Char] | Null, String] = {
@@ -25,7 +25,7 @@ object string {
 
   private val stringKind = Kind(10, "string")
 
-  given parserMatchingString : Conversion[String, Parser[String]] = (s: String) => new Parser[String] {
+  given parserMatchingString as Conversion[String, Parser[String]] = (s: String) => new Parser[String] {
     override def kind : Kind = stringKind
     override def detailImpl = "\"" + s + "\""
     override def parseImpl(input: ParserState[Char]) : Either[ParserError[Char] | Null, String] = {
@@ -38,5 +38,5 @@ object string {
     }
   }
 
-  given parserMatchingChar : Conversion[Char, Parser[Char]] = (c: Char) => satisfy[Char](_ == c) withStrongName s"'$c'"
+  given parserMatchingChar as Conversion[Char, Parser[Char]] = (c: Char) => satisfy[Char](_ == c) withStrongName s"'$c'"
 }

@@ -1,4 +1,4 @@
-val dottyVersion = "0.22.0-RC1"
+val dottyVersion = "0.23.0-RC1"
 
 lazy val root = project
   .in(file("."))
@@ -11,5 +11,6 @@ lazy val root = project
     libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % "test",
 
     scalacOptions += "-Yexplicit-nulls",
-    scalacOptions += "-Ykind-projector"
+    scalacOptions += "-Ykind-projector",
+    scalacOptions += "-Ycheck-init"
   )

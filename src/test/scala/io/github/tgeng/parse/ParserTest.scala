@@ -6,7 +6,7 @@ import org.junit.Assert._
 import org.junit.Test
 
 class ParserTest {
-  import io.github.tgeng.parse.string.{_, given}
+  import io.github.tgeng.parse.string.{_, given _}
   import io.github.tgeng.parse._
   @Test
   def `basic parsers` = {
@@ -358,8 +358,8 @@ class ParserTest {
 
 }
 
-private def testing[I, T](parser: ParserT[I, T])(block: (given p: ParserT[I, T]) => Unit) = {
-  block(given parser)
+private def testing[I, T](parser: ParserT[I, T])(block: ParserT[I, T] ?=> Unit) = {
+  block(using parser)
 }
 
 private def [I, T](input: IndexedSeq[I]) ~> (expected: T)(using parser: ParserT[I, T]) = {
