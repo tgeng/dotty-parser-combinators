@@ -114,7 +114,7 @@ private def pureKind = Kind(10, "pure")
 
 /** Parser that does not consume any input and simply return the given output.
   *
-  * This is the unit of the parser monad. 
+  * This is the unit of the parser monad. This parser always succeeds.
   */
 def pure[I, T](t: T, aName : String = "<pure>") = new ParserT[I, T] {
   override def kind : Kind = pureKind

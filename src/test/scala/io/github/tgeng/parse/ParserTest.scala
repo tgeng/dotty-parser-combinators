@@ -53,7 +53,7 @@ class ParserTest {
       "def" ~^ """0: "abc""""
     }
 
-    testing("[0-9]+".r) {
+    testing("[0-9]+".rp) {
       "123" ~> "123"
       "123abc" ~> "123"
       "abc" ~^ """0: /[0-9]+/"""
@@ -74,9 +74,9 @@ class ParserTest {
 
   @Test
   def `commit operator and |` = {
-    val oct = "0" >> !"[0-7]+".r withName "oct"
-    val hex = "0x" >> !"[0-9a-f]+".r withName "hex"
-    val octOrHex = hex | oct | ".*".r
+    val oct = "0" >> !"[0-7]+".rp withName "oct"
+    val hex = "0x" >> !"[0-9a-f]+".rp withName "hex"
+    val octOrHex = hex | oct | ".*".rp
 
     testing(octOrHex) {
       "0xaaf" ~> "aaf"
@@ -91,7 +91,7 @@ class ParserTest {
 
   @Test
   def `commit operator and *` = {
-    val p = ":" >> !"\\w+".r
+    val p = ":" >> !"\\w+".rp
     testing(p*) {
       ":abc" ~> Seq("abc")
       ":abc:def" ~> Seq("abc", "def" )
@@ -124,7 +124,7 @@ class ParserTest {
     val alphabet = satisfy[Char](Character.isAlphabetic(_)) withName "alphabet"
     val digit = satisfy[Char](Character.isDigit(_)) withName "digit"
     val keyword = ("def" | "class" | "val") << not(!alphabet) withName "keyword"
-    val identifier = "\\w+".r & not(keyword) & not(digit) // not starting with digit
+    val identifier = "\\w+".rp & not(keyword) & not(digit) // not starting with digit
 
     testing(identifier) {
       "abc" ~> "abc"
@@ -174,7 +174,7 @@ class ParserTest {
 
   @Test
   def `sepBy operator` = {
-    val word = "\\w+".r withName "word"
+    val word = "\\w+".rp withName "word"
     testing(word sepBy1 ',') {
       "abc" ~> Seq("abc" )
       "abc,def" ~> Seq("abc", "def" )
@@ -202,7 +202,7 @@ class ParserTest {
 
   @Test
   def `prefix and suffix` = {
-    val word = "\\w+".r withName "word"
+    val word = "\\w+".rp withName "word"
     testing('(' >> word << ')') {
     "(abc)" ~> "abc"
     "(abc)def" ~> "abc"
@@ -220,7 +220,7 @@ class ParserTest {
   @Test
   def `apply operator` = {
     val spaces = parser(' ')*
-    val number = ("[0-9]+".r << spaces).map(_.toInt) withName "number"
+    val number = ("[0-9]+".rp << spaces).map(_.toInt) withName "number"
     testing(pure((a: Int, b: Int) => a + b, "Sum2") <*> (number, number)) {
       "12 34" ~> 46
       "12 ab" ~^ """
@@ -250,18 +250,18 @@ class ParserTest {
   @Test
   def `chainedLeftBy and chainedRightBy` = {
     val op = ("+" | "-").map(op => ((a: String, b: String) => "(" + a + op + b + ")"))
-    testing(".".r chainedLeftBy op) {
+    testing(".".rp chainedLeftBy op) {
       "a+b+c" ~> "((a+b)+c)"
     }
-    testing(".".r chainedRightBy op) {
+    testing(".".rp chainedRightBy op) {
       "a+b+c" ~> "(a+(b+c))"
     }
   }
 
   val realNumber : Parser[Double] = for {
     sign <- ('-'?).map(_.map(_ => -1).getOrElse(1))
-    beforePoint <- "[0-9]+".r
-    afterPoint <- (('.' >> !"[0-9]+".r)?)
+    beforePoint <- "[0-9]+".rp
+    afterPoint <- (('.' >> !"[0-9]+".rp)?)
       .map(_.map(s => s.toInt / math.pow(10.0, s.size))
             .getOrElse(0.0))
   } yield sign * (beforePoint.toInt + afterPoint)
