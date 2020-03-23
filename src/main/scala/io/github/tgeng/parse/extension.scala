@@ -149,7 +149,7 @@ def applyKind = Kind(10, "apply")
   * [[arg1P]]. 
   */
 def [I, F, T](fnP: ParserT[I, F => T])<*>(
-  arg1P: => ParserT[I, F]
+  arg1P: ParserT[I, F]
   ) : ParserT[I, T] = (for {
   fn <- fnP
   arg1 <- arg1P
@@ -161,8 +161,8 @@ def [I, F, T](fnP: ParserT[I, F => T])<*>(
   * [[arg1P]], [[arg2P]].
   */
 def [I, F1, F2, T](fnP: ParserT[I, (F1, F2) => T])<*>(
-  arg1P: => ParserT[I, F1],
-  arg2P: => ParserT[I, F2],
+  arg1P: ParserT[I, F1],
+  arg2P: ParserT[I, F2],
   ) : ParserT[I, T] = (for {
   fn <- fnP
   arg1 <- arg1P
@@ -175,9 +175,9 @@ def [I, F1, F2, T](fnP: ParserT[I, (F1, F2) => T])<*>(
   * [[arg1P]], [[arg2P]], [[arg3P]].
   */
 def [I, F1, F2, F3, T](fnP: ParserT[I, (F1, F2, F3) => T])<*>(
-  arg1P: => ParserT[I, F1],
-  arg2P: => ParserT[I, F2],
-  arg3P: => ParserT[I, F3],
+  arg1P: ParserT[I, F1],
+  arg2P: ParserT[I, F2],
+  arg3P: ParserT[I, F3],
   ) : ParserT[I, T] = (for {
   fn <- fnP
   arg1 <- arg1P
@@ -191,10 +191,10 @@ def [I, F1, F2, F3, T](fnP: ParserT[I, (F1, F2, F3) => T])<*>(
   * [[arg1P]], [[arg2P]], [[arg3P]], [[arg4P]].
   */
 def [I, F1, F2, F3, F4, T](fnP: ParserT[I, (F1, F2, F3, F4) => T])<*>(
-  arg1P: => ParserT[I, F1],
-  arg2P: => ParserT[I, F2],
-  arg3P: => ParserT[I, F3],
-  arg4P: => ParserT[I, F4],
+  arg1P: ParserT[I, F1],
+  arg2P: ParserT[I, F2],
+  arg3P: ParserT[I, F3],
+  arg4P: ParserT[I, F4],
   ) : ParserT[I, T] = (for {
   fn <- fnP
   arg1 <- arg1P
