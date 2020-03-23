@@ -162,12 +162,23 @@ def [I, T, R](p: ParserT[I, T]) flatMap(f: T => ParserT[I, R]) : ParserT[I, R] =
   }
 }
 
-/** Gives the input parser a name for pretty printing. */
+/** Gives the input parser a name for pretty printing.
+  * 
+  * In addition, the input parser is used lazily such that the input parser can
+  * reference itself directly or transitively. Any recursive parsers must have a
+  * name, otherwise building the parser itself will incur infinite recursions,
+  * causing stack overflow while building the parser.
+  */
 def [I, T](p: => ParserT[I, T]) withName(newName: String) : ParserT[I, T] = 
   p.withNameAndDetail(newName, null)
 
 /** Gives the input parser a name for pretty printing.
   * 
+  * In addition, the input parser is used lazily such that the input parser can
+  * reference itself directly or transitively. Any recursive parsers must have a
+  * name, otherwise building the parser itself will incur infinite recursions,
+  * causing stack overflow while building the parser.
+  *
   * Comparing with [[withName]], this method suppresses the [[detail]] of the
   * input parser.
   */
