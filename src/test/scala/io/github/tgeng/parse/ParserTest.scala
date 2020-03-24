@@ -19,7 +19,7 @@ class ParserTest {
     testing(position) {
       "" ~> 0
     }
-    testing(empty) {
+    testing(nothing) {
       "" ~> (())
       "abc" ~> (())
     }
@@ -296,6 +296,27 @@ class ParserTest {
   }
 
   @Test
+  def `lifting` = {
+    val abParser = lift(Vector("a".p, "b".p))
+    testing(abParser) {
+      "ab" ~> Vector("a", "b")
+      "cd" ~^ """
+        0: "a"
+        0: lift{"a", "b"}
+      """
+    }
+
+    val abcParser = lift("a".p, "b".p, "c".p)
+    testing(abcParser) {
+      "abc" ~> ("a", "b", "c")
+      "abd" ~^ """
+        2: "c"
+        0: ("a", "b", "c")
+      """
+    }
+  }
+
+  @Test
   def `calculator` = {
     val spaces = parser(' ')*
     val plus = ('+'!) as ((a: Double, b: Double) => a + b) withName "+"
@@ -402,15 +423,92 @@ class ParserTest {
     "'$t'" ~> "\t"
     "'$'quoted$$string$''" ~> "'quoted$string'"
     "abc" ~^ """
-      0: '''
+      0: '''!
       0: <'-quoted>
     """
     "'abc" ~^ """
-      4: '''
+      4: '''!
       0: <'-quoted>
     """
   }
+
+  import JValue._
+
+  val jNull = ("null"!) as JNull withName "<jNull>"
+
+  def jBoolean = (("true"!) as JBoolean(true)) | (("false"!) as JBoolean(false)) withName "<jBoolean>"
+
+  val jNumber = (double.map(JNumber(_))!) withName "<jNumber>"
+
+  def jString = quoted().map(JString(_)) withName "<jString>"
+
+  def jArray : Parser[JValue] = ('['!) >> (jValue sepBy ',').map(JArray(_))  << (']'!) withName "<jArray>"
+
+  val jObjectKey = whitespaces >> quoted() << whitespaces withName "<jObjectKey>"
+
+  def jObjectEntry : Parser[(String, JValue)] = lift(jObjectKey << ":", !jValue) withName "<jObjectEntry>"
+
+  def jObject : Parser[JValue] = 
+    ('{'!) >> 
+    (jObjectEntry sepBy ',').map(c => JObject(c.toMap))
+    << ('}'!) withName "<jObject>"
+
+  def jValue : Parser[JValue] = 
+    whitespaces >> 
+    (jNull | jBoolean | jNumber | jString | jArray | jObject) 
+    << whitespaces withName "<jValue>"
+
+  @Test
+  def `json parser` = testing(jValue) {
+    """
+    {
+      "null" : null,
+      "true" : true,
+      "false" : false,
+      "string" : "foo \"bar\"",
+      "array" : [1, "a", null, true, ["nested", "array"], {}],
+      "object" : {
+        "foo" : "bar"
+      }
+    }
+    """ ~> JObject(Map(
+      "null" -> JNull, 
+      "true" -> JBoolean(true),
+      "false" -> JBoolean(false),
+      "string" -> JString("foo \"bar\""), 
+      "array" -> JArray(Vector(JNumber(1.0), JString("a"), JNull, JBoolean(true), JArray(Vector(JString("nested"), JString("array"))), JObject(Map()))), 
+      "object" -> JObject(Map("foo" -> JString("bar"))), 
+      ))
+
+    "blah" ~^ """
+      0: '{'!
+      0: <jObject> := '{'! >> (<jObjectEntry> sepBy ',') << '}'!
+      0: <jNull> | <jBoolean> | <jNumber> | <jString> | <jArray> | <jObject>
+      0: <jValue> := <whitespaces> >> (<jNull> | <jBoolean> | <jNumber> | <jString> | <jArray> | <jObject>) << <whitespaces>
+    """
+    
+    """
+    {
+      "foo": "missing comma on the right"
+      "bar": "blah"
+    }
+    """ ~^ """
+      55: '}'!
+      5: <jObject> := '{'! >> (<jObjectEntry> sepBy ',') << '}'!
+      5: <jNull> | <jBoolean> | <jNumber> | <jString> | <jArray> | <jObject>
+      0: <jValue> := <whitespaces> >> (<jNull> | <jBoolean> | <jNumber> | <jString> | <jArray> | <jObject>) << <whitespaces>
+    """
+  }
 }
+
+enum JValue {
+  case JNull
+  case JBoolean(value: Boolean)
+  case JNumber(value: Double)
+  case JString(value: String)
+  case JArray(value: Vector[JValue])
+  case JObject(value: Map[String, JValue])
+}     
 
 private def testing[I, T](parser: ParserT[I, T])(block: ParserT[I, T] ?=> Unit) = {
   block(using parser)

@@ -54,6 +54,11 @@ scala> positiveInt.parse("123")
 val res0: Either[io.github.tgeng.parse.ParserError[Char], Int] = Right(123)
 ```
 
+### Example
+
+```
+```
+
 ### Matching strings
 
 Scala `Char`, `String`, and `Regex` can be implicitly converted to parsers
@@ -96,8 +101,7 @@ val res6: Either[io.github.tgeng.parse.ParserError[Char], Char] = Left(0: 'x')
 
 ### Combinators
 
-Many common combinators are provided. Following is an example that
-demonstrates the usage of some of them. To see all of them please refer to
+Many common combinators are provided. To see all of them please refer to
 [core.scala](https://github.com/tgeng/dotty-parser-combinators/blob/master/src/main/scala/io/github/tgeng/parse/core.scala)
 and
 [extension.scala](https://github.com/tgeng/dotty-parser-combinators/blob/master/src/main/scala/io/github/tgeng/parse/extension.scala).

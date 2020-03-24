@@ -6,7 +6,7 @@ import scala.collection.IndexedSeq
 def [I, R](p: ParserT[I, ?]) as(r: R) : ParserT[I, R] = p.map(_ => r)
 
 /** Does nothing and always succeeds. */
-val empty: ParserT[Any, Unit] = pure(()) withStrongName "<empty>"
+val nothing: ParserT[Any, Unit] = pure(()) withStrongName "<nothing>"
 
 /** Matches any input token and returns it. */
 def any[I] : ParserT[I, I] = satisfy[I](_ => true) withStrongName "<any>"
@@ -55,7 +55,7 @@ def [I, T](p: ParserT[I, T])+ : ParserT[I, Vector[T]] = {
 /** Repeats the parser zero or one times and return an option of the result. */
 def [I, T](p: ParserT[I, T])? : ParserT[I, Option[T]] = {
   val kind = Kind(9, "?")
-  (p.map(Some[T]) | (empty as None)) withDetailAndKind(
+  (p.map(Some[T]) | (nothing as None)) withDetailAndKind(
     p.name(kind) + "?",
     kind
   )
@@ -72,7 +72,7 @@ def [I, T](p: ParserT[I, T]) sepBy1 (s: ParserT[I, ?]) : ParserT[I, Vector[T]] =
 /** Parses [[p]] repeatedly at zero or more times, separated by [[s]]. */
 def [I, T](p: ParserT[I, T]) sepBy (s: ParserT[I, ?]) : ParserT[I, Vector[T]] = {
   val sepKind = Kind(0, "sepBy")
-  (p.sepBy1(s) | (empty as Vector.empty)) withDetailAndKind (
+  (p.sepBy1(s) | (nothing as Vector.empty)) withDetailAndKind (
   s"${p.name(sepKind)} sepBy ${s.name(sepKind)}",
   sepKind)
 }
@@ -83,7 +83,7 @@ def [I, T](p: ParserT[I, T]) sepBy (s: ParserT[I, ?]) : ParserT[I, Vector[T]] = 
 def [I, T](p: ParserT[I, T]) sepByN (count: Int) (s: ParserT[I, ?]) : ParserT[I, Vector[T]] = {
   val sepKind = Kind(0, "sepByN")
   count match {
-    case 0 => empty as Vector.empty[T]
+    case 0 => nothing as Vector.empty[T]
     case 1 => p.map(Vector[T](_))
     case n => p +: (n - 1) * (s >> p)
   } withDetailAndKind (
@@ -238,3 +238,32 @@ def [I, T, CC[_], C <: scala.collection.IterableOps[T, CC, C]](p1: ParserT[I, C]
 } yield ts1 ++ ts2).withDetailAndKind(
   s"${p1.name(prependAppendConcat)} ++ ${p2.name(prependAppendConcat)}",
   prependAppendConcat)
+
+def  lift[I, T, CC[_], C <: scala.collection.SeqOps[ParserT[I, T], CC, C]](parsers: C) : ParserT[I, CC[T]] =
+  parsers.foldLeft(
+      // I could not figure out how to create an empty CC[T] without using this
+      // casting.
+      pure[I, CC[T]](parsers.empty.asInstanceOf[CC[T]])
+    )(
+      // Sadly CC[T] is too weak here to call `:+` defined above. So we force
+      // cast and cast back.
+      (acc, e) => (acc.asInstanceOf[ParserT[I, Seq[T]]] :+ e).asInstanceOf[ParserT[I, CC[T]]]) withStrongName 
+        s"lift{${parsers.toSeq.map(_.name()).mkString(", ")}}"
+
+def lift[I, A, B](tuple: (ParserT[I, A], ParserT[I, B])) : ParserT[I, (A, B)] = (for {
+  a <- tuple._1
+  b <- tuple._2
+} yield (a, b)) withStrongName s"(${tuple._1.name()}, ${tuple._2.name()})"
+
+def lift[I, A, B, C](tuple: (ParserT[I, A], ParserT[I, B], ParserT[I, C])) : ParserT[I, (A, B, C)] = (for {
+  a <- tuple._1
+  b <- tuple._2
+  c <- tuple._3
+} yield (a, b, c)) withStrongName s"(${tuple._1.name()}, ${tuple._2.name()}, ${tuple._3.name()})"
+
+def lift[I, A, B, C, D](tuple: (ParserT[I, A], ParserT[I, B], ParserT[I, C], ParserT[I, D])) : ParserT[I, (A, B, C, D)] = (for {
+  a <- tuple._1
+  b <- tuple._2
+  c <- tuple._3
+  d <- tuple._4
+} yield (a, b, c, d)) withStrongName s"(${tuple._1.name()}, ${tuple._2.name()}, ${tuple._3.name()}, ${tuple._4.name()})"
