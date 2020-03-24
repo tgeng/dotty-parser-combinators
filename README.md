@@ -54,9 +54,81 @@ scala> positiveInt.parse("123")
 val res0: Either[io.github.tgeng.parse.ParserError[Char], Int] = Right(123)
 ```
 
-### Example
+### JSON parser Example
 
+Assuming we have the following data classes representing JSON values.
+
+```scala
+enum JValue {
+  case JNull
+  case JBoolean(value: Boolean)
+  case JNumber(value: Double)
+  case JString(value: String)
+  case JArray(value: Vector[JValue])
+  case JObject(value: Map[String, JValue])
+}     
 ```
+
+Below is a simple parser that converts a JSON string to a `JValue`.
+
+```scala
+//                         ┌──────── withName ────────┐
+//                 ┌────── as ─────┐                  │
+//          ┌────  >> ────┐        │                  │
+val jNull = ('n'!) >> "ull" as JNull withName "<jNull>"
+//              │  │        │           │
+//              │  │        │           └ give it a intuitive name so the error message is
+//              │  │        │             easier to understand
+//              │  │        │
+//              │  │        └ convert the string parser returning "ull" to a parser returning
+//              │  │          `JNull`
+//              │  │
+//              │  └ throw away result from the first parser, which matches 'n', and return
+//              │    the result of the second parser, which, in this case, returns "ull"
+//              │
+//              └ commit right after seeing 'n' to speed up parsing failure in case 'n' is 
+//                followed by things other than "ull". Without committing, the parser would keep 
+//                trying <jBoolean>, <jNumber>, and so on.
+
+//                     ┌ one can also commit right before a parser
+//                     │                          
+//                     │                         ┌ if matching "true" fails, try the following
+//                     │                         │ to match false
+//                     │                         │
+def jBoolean = ('t' >> !"rue" as JBoolean(true)) | 
+               ('f' >> !"alse" as JBoolean(false)) withName "<jBoolean>"
+
+val jNumber = (double.map(JNumber(_))!) withName "<jNumber>"
+//                     │
+//                     └ similar to `as`, but it consumes the result from the double parser
+
+def jString = quoted().map(JString(_)) withName "<jString>"
+
+def jArray : Parser[JValue] = 
+  ('['!) >> (jValue sepBy ',').map(JArray(_)) << (']'!) withName "<jArray>"
+//                    │
+//                    └ matches `JValue` objects separated by `,` zero or more times and returns
+//                      the matched `JValue`s inside a `Vector`
+
+val jObjectKey = whitespaces >> quoted() << whitespaces withName "<jObjectKey>"
+
+def jObjectEntry : Parser[(String, JValue)] =
+  lift(jObjectKey << ":"!, jValue) withName "<jObjectEntry>"
+// │
+// └ combines two parsers `jObjectKey << ":"` and `jValue` and produce a parser that returns a 
+//   tuple containing the parsed key string and `JValue` object.
+
+def jObject : Parser[JValue] = 
+  ('{'!) >> 
+  (jObjectEntry sepBy ',').map(c => JObject(c.toMap))
+  << ('}'!) withName "<jObject>"
+
+def jValue : Parser[JValue] = 
+  whitespaces >> 
+  (jNull | jBoolean | jNumber | jString | jArray | jObject) 
+  << whitespaces withName "<jValue>"
+
+jValue.parse("""[1, "a", {}]""") // JArray([JNumber(1), JString("a"), JObject({})])
 ```
 
 ### Matching strings
