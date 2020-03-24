@@ -155,8 +155,8 @@ class ParserTest {
       """
     }
     testing(abc?) {
-      "abcabcabd".~>[Char, Option[String]](Some("abc"))
-      "def".~>[Char, Option[String]](None)
+      "abcabcabd".~>[Option[String]](Some("abc"))
+      "def".~>[Option[String]](None)
     }
   }
 
@@ -258,14 +258,6 @@ class ParserTest {
     }
   }
 
-  val realNumber : Parser[Double] = for {
-    sign <- ('-'?).map(_.map(_ => -1).getOrElse(1))
-    beforePoint <- "[0-9]+".rp
-    afterPoint <- (('.' >> !"[0-9]+".rp)?)
-      .map(_.map(s => s.toInt / math.pow(10.0, s.size))
-            .getOrElse(0.0))
-  } yield sign * (beforePoint.toInt + afterPoint)
-
   @Test
   def `prepend append concat` = {
     val a = parser('a')
@@ -273,7 +265,7 @@ class ParserTest {
     val c = parser('c')
 
     testing(a +:+ b) {
-      "abc".~>[Char, IndexedSeq[Char]]("ab")
+      "abc".~>[IndexedSeq[Char]]("ab")
       "a" ~^ """
         1: 'b'
         0: 'a' +:+ 'b'
@@ -281,45 +273,26 @@ class ParserTest {
     }
     val ab = a +:+ b
     testing(c +: ab) {
-      "cab".~>[Char, IndexedSeq[Char]]("cab")
+      "cab".~>[IndexedSeq[Char]]("cab")
       "ab" ~^ """
         0: 'c'
         0: 'c' +: 'a' +:+ 'b'
       """
     }
     testing(ab :+ c) {
-      "abc".~>[Char, IndexedSeq[Char]]("abc")
+      "abc".~>[IndexedSeq[Char]]("abc")
       "abd" ~^ """
         2: 'c'
         0: 'a' +:+ 'b' :+ 'c'
       """
     }
     testing(ab ++ ab) {
-      "abab".~>[Char, IndexedSeq[Char]]("abab")
+      "abab".~>[IndexedSeq[Char]]("abab")
       "abc" ~^ """
         2: 'a'
         0: 'a' +:+ 'b' ++ 'a' +:+ 'b'
       """
     }
-  }
-
-  @Test
-  def `parse real number` = testing(realNumber) {
-    "2" ~> 2.0
-    "-50" ~> -50.0
-    "-50.25" ~> -50.25
-    "30.5" ~> 30.5
-    "123a" ~> 123.0
-    "abc" ~^  """
-      0: /[0-9]+/
-      0: '-'? /[0-9]+/ <?>
-    """
-    "4." ~^  """
-      2: !/[0-9]+/
-      1: '.' >> !/[0-9]+/
-      1: ('.' >> !/[0-9]+/)?
-      0: '-'? /[0-9]+/ ('.' >> !/[0-9]+/)?
-    """
   }
 
   @Test
@@ -337,7 +310,7 @@ class ParserTest {
       term.chainedLeftBy(spaces >> (multiply | divide) << spaces) withName "prodExpr"
 
     def term: Parser[Double] =
-      realNumber |
+      double |
       "(" >> spaces >> sumExpr << spaces << ")" withName "term"
 
     testing(sumExpr << eof) {
@@ -356,13 +329,94 @@ class ParserTest {
     }
   }
 
+  @Test
+  def `simple string parsers` = {
+    testing(space) {
+      " " ~> ' '
+    }
+    testing(spaces) {
+      "  a" ~> "  "
+      "" ~> ""
+      " \t" ~> " "
+    }
+    testing(whitespace) {
+      " " ~> ' '
+      "\t" ~> '\t'
+    }
+    testing(whitespaces) {
+      " \t \n" ~> " \t \n"
+      "" ~> ""
+    }
+
+    testing(lf) {
+      "\n" ~> '\n'
+    }
+    testing(cr) {
+      "\r" ~> '\r'
+    }
+    testing(crlf) {
+      "\r\n" ~> "\r\n"
+    }
+
+    testing(upper) {
+      "A" ~> 'A'
+      "a" ~^ "0: <upper>"
+    }
+    testing(lower) {
+      "a" ~> 'a'
+      "A" ~^ "0: <lower>"
+    }
+    testing(digit) {
+      "7" ~> '7'
+      "a" ~^ "0: <digit>"
+    }
+    testing(alphaNum) {
+      "a" ~> 'a'
+      "A" ~> 'A'
+      "1" ~> '1'
+    }
+
+    testing(int) {
+      "123" ~> 123
+      "+12" ~> 12
+      "-23" ~> -23
+      "abc" ~^ "0: <int>"
+    }
+    testing(double) {
+      "+2" ~> 2.0
+      "-50" ~> -50.0
+      "-50.25" ~> -50.25
+      "30.5" ~> 30.5
+      "123a" ~> 123.0
+      "4." ~> 4.0
+      ".5" ~> 0.5
+      "abc" ~^  """
+        0: <double>
+      """
+    }
+  }
+
+  @Test
+  def `test quoted` = testing(quoted(quoteSymbol = '\'', escapeSymbol = '$')) {
+    "'abc'" ~> "abc"
+    "'$t'" ~> "\t"
+    "'$'quoted$$string$''" ~> "'quoted$string'"
+    "abc" ~^ """
+      0: '''
+      0: <'-quoted>
+    """
+    "'abc" ~^ """
+      4: '''
+      0: <'-quoted>
+    """
+  }
 }
 
 private def testing[I, T](parser: ParserT[I, T])(block: ParserT[I, T] ?=> Unit) = {
   block(using parser)
 }
 
-private def [I, T](input: IndexedSeq[I]) ~> (expected: T)(using parser: ParserT[I, T]) = {
+private def [T](input: String) ~> (expected: T)(using parser: string.Parser[T]) = {
   parser.parse(input) match {
     case Right(actual) => (actual == expected) match {
       case true => ()
@@ -380,7 +434,7 @@ private def [I, T](input: IndexedSeq[I]) ~> (expected: T)(using parser: ParserT[
   }
 }
 
-private def [I, T](input: IndexedSeq[I]) ~^ (errorMessage: String)(using parser: ParserT[I, T]) = {
+private def [T](input: String) ~^ (errorMessage: String)(using parser: string.Parser[T]) = {
   val t = parser.parse(input)
   val trimmedMessage = errorMessage.trim.replaceAll("\n +", "\n")
   t match {
