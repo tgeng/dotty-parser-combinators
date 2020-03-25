@@ -1,4 +1,4 @@
-# Dotty Parser Combinators
+# Dotty Parser Combinators [![Actions Status](https://github.com/tgeng/dotty-parser-combinators/workflows/Scala%20CI/badge.svg)](https://github.com/tgeng/dotty-parser-combinators/actions)
 
 This is a parser combinator library for [Dotty](https://dotty.epfl.ch/).
 Since Dotty is still under active development, the language features and APIs
