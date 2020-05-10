@@ -1,14 +1,51 @@
-# Simple Build Tool
-# http://www.scala-sbt.org/release/docs/Getting-Started/Directories.html#configuring-version-control
+.dotty-ide-artifact
+.dotty-ide.json
 
+*.class
+*.log
+
+# sbt specific
+.cache
+.history
+.lib/
 dist/*
 target/
 lib_managed/
 src_managed/
 project/boot/
 project/plugins/project/
-.history
-.cache
-.lib/
-.dotty-ide-artifact
-.dotty-ide.json
+**/.bloop
+
+# Scala-IDE specific
+.scala_dependencies
+.worksheet
+
+.idea
+
+# ENSIME specific
+.ensime_cache/
+.ensime
+
+.metals/
+metals.sbt
+metals/project/
+
+.vscode/
+
+local.*
+
+.DS_Store
+
+node_modules
+
+lib/core/metadata.js
+lib/core/MetadataBlog.js
+
+website/translated_docs
+website/build/
+website/yarn.lock
+website/node_modules
+website/i18n/*
+!website/i18n/en.json
+
+project/metals.sbt
