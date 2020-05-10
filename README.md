@@ -66,7 +66,7 @@ enum JValue {
   case JString(value: String)
   case JArray(value: Vector[JValue])
   case JObject(value: Map[String, JValue])
-}     
+}
 ```
 
 Below is a simple parser that converts a JSON string to a `JValue`.
@@ -86,16 +86,16 @@ val jNull = ('n'!) >> "ull" as JNull withName "<jNull>"
 //              │  └ throw away result from the first parser, which matches 'n', and return
 //              │    the result of the second parser, which, in this case, returns "ull"
 //              │
-//              └ commit right after seeing 'n' to speed up parsing failure in case 'n' is 
-//                followed by things other than "ull". Without committing, the parser would keep 
+//              └ commit right after seeing 'n' to speed up parsing failure in case 'n' is
+//                followed by things other than "ull". Without committing, the parser would keep
 //                trying <jBoolean>, <jNumber>, and so on.
 
 //                     ┌ one can also commit right before a parser
-//                     │                          
+//                     │
 //                     │                         ┌ if matching "true" fails, try the following
 //                     │                         │ to match false
 //                     │                         │
-def jBoolean = ('t' >> !"rue" as JBoolean(true)) | 
+def jBoolean = ('t' >> !"rue" as JBoolean(true)) |
                ('f' >> !"alse" as JBoolean(false)) withName "<jBoolean>"
 
 val jNumber = (double.map(JNumber(_))!) withName "<jNumber>"
@@ -104,7 +104,7 @@ val jNumber = (double.map(JNumber(_))!) withName "<jNumber>"
 
 def jString = quoted().map(JString(_)) withName "<jString>"
 
-def jArray : Parser[JValue] = 
+def jArray : Parser[JValue] =
   ('['!) >> (jValue sepBy ',').map(JArray(_)) << (']'!) withName "<jArray>"
 //                    │
 //                    └ matches `JValue` objects separated by `,` zero or more times and returns
@@ -115,17 +115,17 @@ val jObjectKey = whitespaces >> quoted() << whitespaces withName "<jObjectKey>"
 def jObjectEntry : Parser[(String, JValue)] =
   lift(jObjectKey << ":"!, jValue) withName "<jObjectEntry>"
 // │
-// └ combines two parsers `jObjectKey << ":"` and `jValue` and produce a parser that returns a 
+// └ combines two parsers `jObjectKey << ":"` and `jValue` and produce a parser that returns a
 //   tuple containing the parsed key string and `JValue` object.
 
-def jObject : Parser[JValue] = 
-  ('{'!) >> 
+def jObject : Parser[JValue] =
+  ('{'!) >>
   (jObjectEntry sepBy ',').map(c => JObject(c.toMap))
   << ('}'!) withName "<jObject>"
 
-def jValue : Parser[JValue] = 
-  whitespaces >> 
-  (jNull | jBoolean | jNumber | jString | jArray | jObject) 
+def jValue : Parser[JValue] =
+  whitespaces >>
+  (jNull | jBoolean | jNumber | jString | jArray | jObject)
   << whitespaces withName "<jValue>"
 
 jValue.parse("""[1, "a", {}]""") // JArray([JNumber(1), JString("a"), JObject({})])
@@ -186,3 +186,4 @@ For more examples, please refer to
 | Dotty    | dotty-parser-combinators |
 | -------- | ------------------------ |
 | 0.23-RC1 | 0.1.0                    |
+| 0.24-RC1 | 0.1.1                    |
