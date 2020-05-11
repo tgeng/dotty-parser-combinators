@@ -4,7 +4,7 @@ lazy val root = project
   .in(file("."))
   .settings(
     name := "dotty-parser-combinators",
-    version := "0.1.1",
+    version := "0.1.2",
     organization := "io.github.tgeng",
 
     scalaVersion := dottyVersion,
