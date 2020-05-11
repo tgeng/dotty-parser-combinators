@@ -432,6 +432,14 @@ class ParserTest {
     """
   }
 
+  @Test 
+  def `test satisfying` = testing(".*".rp.satisfying(_ == "foo")) {
+    "foo" ~> "foo"
+    "foobar" ~^ """
+      0: /.*/ satisfying some custom predicate
+    """
+  }
+
   import JValue._
 
   //                         ┌──────── withName ────────┐

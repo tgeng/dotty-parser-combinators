@@ -262,8 +262,8 @@ private val notKind = Kind(5, "not")
   * 
   * If the input parser matches, the negated parser would fail. Otherwise, the
   * negated parser succeeds with [[Unit]]. This combinator is often useful with
-  * [[&]]. For example `anyToken & not("def")` would match any tokens other than
-  * the keyword "def".
+  * [[&]]. For example `anyToken & not("def" << not(letter))` would match any 
+  * tokens other than the keyword "def".
   */
 def not[I](p: ParserT[I, ?]) = new ParserT[I, Unit] {
   override def kind : Kind = notKind
@@ -321,9 +321,6 @@ private val andKind = Kind(2, "&")
   * Combines input parsers and pass on the result of the left parser. The result
   * of the right parser is discarded. But if the right parser fails, the overall
   * parser fails as well.
-  *
-  * This combinator is often useful together with [[not]]. For example,
-  * `anyToken & not("def")` would match any tokens other than the keyword "def".
   */ 
 def [I, T](p: ParserT[I, T]) & (cond: ParserT[I, Any]): ParserT[I, T] = new ParserT[I, T] {
   override def kind : Kind = andKind
@@ -424,4 +421,20 @@ def satisfy[I](predicate: I => Boolean) = new ParserT[I, I] {
       Left(ParserError(position, this, null))
     }
   }
+}
+
+/** Augment the given parser with additional predicate testing the parsed 
+ * result. If the result fails the predicate, the returned parser fails parsing.
+ */
+def [I, T](p: ParserT[I, T]) satisfying(predicate: T => Boolean, predicateName: String = "some custom predicate") = new ParserT[I, T] {
+    override def kind : Kind = p.kind
+    override def detailImpl = p.detailImpl + " satisfying " + predicateName
+    override def parseImpl(input: ParserState[I]) : Either[ParserError[I] | Null, T] =
+      val position = input.position
+      p.parse(input).flatMap{ t =>
+        predicate(t) match {
+          case true => Right(t)
+          case false => Left(ParserError(position, this, null))
+        }
+      }
 }
