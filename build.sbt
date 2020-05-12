@@ -4,12 +4,14 @@ lazy val root = project
   .in(file("."))
   .settings(
     name := "dotty-parser-combinators",
-    version := "0.1.2",
+    version := "0.2.0",
     organization := "io.github.tgeng",
 
     scalaVersion := dottyVersion,
 
-    libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % "test",
+    libraryDependencies ++= Seq(
+      "com.novocode" % "junit-interface" % "0.11" % "test",
+    ),
 
     scalacOptions += "-Yexplicit-nulls",
     scalacOptions += "-Ykind-projector",

@@ -142,7 +142,7 @@ class ParserTest {
 
   @Test
   def `suffix operators` = {
-    val abc = parser("abc")
+    val abc = p("abc")
     testing(abc*) {
       "abcabcabd" ~> Seq("abc", "abc" )
       "def" ~> Seq[String]()
@@ -219,7 +219,7 @@ class ParserTest {
 
   @Test
   def `apply operator` = {
-    val spaces = parser(' ')*
+    val spaces = p(' ')*
     val number = ("[0-9]+".rp << spaces).map(_.toInt) withName "number"
     testing(pure((a: Int, b: Int) => a + b, "Sum2") <*> (number, number)) {
       "12 34" ~> 46
@@ -260,9 +260,9 @@ class ParserTest {
 
   @Test
   def `prepend append concat` = {
-    val a = parser('a')
-    val b = parser('b')
-    val c = parser('c')
+    val a = p('a')
+    val b = p('b')
+    val c = p('c')
 
     testing(a +:+ b) {
       "abc".~>[IndexedSeq[Char]]("ab")
@@ -318,7 +318,7 @@ class ParserTest {
 
   @Test
   def `calculator` = {
-    val spaces = parser(' ')*
+    val spaces = p(' ')*
     val plus = ('+'!) as ((a: Double, b: Double) => a + b) withName "+"
     val minus = ('-'!) as ((a: Double, b: Double) => a - b) withName "-"
     val multiply = ('*'!) as ((a: Double, b: Double) => a * b) withName "*"
@@ -442,10 +442,12 @@ class ParserTest {
 
   import JValue._
 
-  //                         ┌──────── withName ────────┐
-  //                 ┌────── as ─────┐                  │
-  //          ┌────  >> ────┐        │                  │
-  val jNull = ('n'!) >> "ull" as JNull withName "<jNull>"
+  //          ┌ a macro that names the parser according to the enclosing definition, For example, in
+  //          | this case, the created parser is named "<jNull>".
+  //          |
+  //          |         ┌────── as ─────┐
+  //          |  ┌────  >> ────┐        │
+  val jNull = P{ ('n'!) >> "ull" as JNull }
   //              │  │        │           │
   //              │  │        │           └ give it a intuitive name so the error message is
   //              │  │        │             easier to understand
@@ -467,36 +469,41 @@ class ParserTest {
   //                     │                         │
   def jBoolean = ('t' >> !"rue" as JBoolean(true)) | 
                  ('f' >> !"alse" as JBoolean(false)) withName "<jBoolean>"
+  //                                                 |
+  //                                                 └ one could name the parser explicitly like so
+  //                                                   without the `P` macro as well
 
-  val jNumber = (double.map(JNumber(_))!) withName "<jNumber>"
-  //                     │
-  //                     └ similar to `as`, but it consumes the result from the double parser
+  val jNumber = P{ double.map(JNumber(_))! }
+  //                        │
+  //                        └ similar to `as`, but it consumes the result from the double parser
 
-  def jString = quoted().map(JString(_)) withName "<jString>"
+  def jString = P{ quoted().map(JString(_)) }
 
   def jArray : Parser[JValue] = 
-    ('['!) >> (jValue sepBy ',').map(JArray(_)) << (']'!) withName "<jArray>"
-  //                    │
-  //                    └ matches `JValue` objects separated by `,` zero or more times and returns
-  //                      the matched `JValue`s inside a `Vector`
+    P{ ('['!) >> (jValue sepBy ',').map(JArray(_)) << (']'!) }
+  //                       │
+  //                       └ matches `JValue` objects separated by `,` zero or more times and 
+  //                         returns the matched `JValue`s inside a `Vector`
 
-  val jObjectKey = whitespaces >> quoted() << whitespaces withName "<jObjectKey>"
+  val jObjectKey = P{ whitespaces >> quoted() << whitespaces }
 
   def jObjectEntry : Parser[(String, JValue)] =
-    lift(jObjectKey << ":"!, jValue) withName "<jObjectEntry>"
-  // │
-  // └ combines two parsers `jObjectKey << ":"` and `jValue` and produce a parser that returns a 
-  //   tuple containing the parsed key string and `JValue` object.
+    P{ lift(jObjectKey << ":"!, jValue) }
+  //    │
+  //    └ combines two parsers `jObjectKey << ":"` and `jValue` and produce a parser that returns a 
+  //      tuple containing the parsed key string and `JValue` object.
 
-  def jObject : Parser[JValue] = 
+  def jObject : Parser[JValue] = P {
     ('{'!) >> 
     (jObjectEntry sepBy ',').map(c => JObject(c.toMap))
-    << ('}'!) withName "<jObject>"
+    << ('}'!) 
+  }
 
-  def jValue : Parser[JValue] = 
+  def jValue : Parser[JValue] = P {
     whitespaces >> 
     (jNull | jBoolean | jNumber | jString | jArray | jObject) 
-    << whitespaces withName "<jValue>"
+    << whitespaces
+  }
 
   @Test
   def `json parser` = testing(jValue) {

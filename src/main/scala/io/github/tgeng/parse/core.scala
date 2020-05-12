@@ -107,9 +107,6 @@ case class ParserError[-I](
   }
 }
 
-/** Facilitates implicit conversion when needed. */
-inline def parser[I, T](p: ParserT[I, T]) = p
-
 private def pureKind = Kind(10, "pure")
 
 /** Parser that does not consume any input and simply return the given output.
@@ -437,4 +434,34 @@ def [I, T](p: ParserT[I, T]) satisfying(predicate: T => Boolean, predicateName: 
           case false => Left(ParserError(position, this, null))
         }
       }
+}
+
+/** Facilitates implicit conversion when needed. */
+inline def parser[I, T](p: ParserT[I, T]) = p
+
+/** Facilitates implicit conversion. In addition name the parser with the
+  * enclosing definition automatically. For example
+  *  
+  * {{{
+  * scala> val keyword = P{ "def" | "val" }
+  * val keyword: io.github.tgeng.parse.ParserT[Char, String] = Parser{keyword}
+  * }}}
+  * 
+  */
+inline def P[I, T](inline parser: => ParserT[I, T]) : ParserT[I, T] = 
+  parser.withNameAndDetail("<" + enclosingName(parser) + ">", null)
+
+
+private inline def enclosingName(inline e: Any): String = ${
+  enclosingNameImpl('e)
+}
+
+import scala.quoted._
+
+private def enclosingNameImpl(e: Expr[Any])(using qctx: QuoteContext): Expr[String] = {
+  import qctx.tasty._
+  val name = rootContext.owner.owner.name
+  //                                ^
+  //                                the macro itself, which we will skip
+  Literal(Constant(name)).seal.asInstanceOf[Expr[String]]
 }

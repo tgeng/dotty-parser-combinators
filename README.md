@@ -72,61 +72,68 @@ enum JValue {
 Below is a simple parser that converts a JSON string to a `JValue`.
 
 ```scala
-//                         ┌──────── withName ────────┐
-//                 ┌────── as ─────┐                  │
-//          ┌────  >> ────┐        │                  │
-val jNull = ('n'!) >> "ull" as JNull withName "<jNull>"
-//              │  │        │           │
-//              │  │        │           └ give it a intuitive name so the error message is
-//              │  │        │             easier to understand
-//              │  │        │
-//              │  │        └ convert the string parser returning "ull" to a parser returning
-//              │  │          `JNull`
-//              │  │
-//              │  └ throw away result from the first parser, which matches 'n', and return
-//              │    the result of the second parser, which, in this case, returns "ull"
-//              │
-//              └ commit right after seeing 'n' to speed up parsing failure in case 'n' is
-//                followed by things other than "ull". Without committing, the parser would keep
-//                trying <jBoolean>, <jNumber>, and so on.
+  //          ┌ a macro that names the parser according to the enclosing definition, For example, in
+  //          | this case, the created parser is named "<jNull>".
+  //          |
+  //          |         ┌────── as ─────┐
+  //          |  ┌────  >> ────┐        │
+  val jNull = P{ ('n'!) >> "ull" as JNull }
+  //              │  │        │           │
+  //              │  │        │           └ give it a intuitive name so the error message is
+  //              │  │        │             easier to understand
+  //              │  │        │
+  //              │  │        └ convert the string parser returning "ull" to a parser returning
+  //              │  │          `JNull`
+  //              │  │
+  //              │  └ throw away result from the first parser, which matches 'n', and return
+  //              │    the result of the second parser, which, in this case, returns "ull"
+  //              │
+  //              └ commit right after seeing 'n' to speed up parsing failure in case 'n' is 
+  //                followed by things other than "ull". Without committing, the parser would keep 
+  //                trying <jBoolean>, <jNumber>, and so on.
 
-//                     ┌ one can also commit right before a parser
-//                     │
-//                     │                         ┌ if matching "true" fails, try the following
-//                     │                         │ to match false
-//                     │                         │
-def jBoolean = ('t' >> !"rue" as JBoolean(true)) |
-               ('f' >> !"alse" as JBoolean(false)) withName "<jBoolean>"
+  //                     ┌ one can also commit right before a parser
+  //                     │                          
+  //                     │                         ┌ if matching "true" fails, try the following
+  //                     │                         │ to match false
+  //                     │                         │
+  def jBoolean = ('t' >> !"rue" as JBoolean(true)) | 
+                 ('f' >> !"alse" as JBoolean(false)) withName "<jBoolean>"
+  //                                                 |
+  //                                                 └ one could name the parser explicitly like so
+  //                                                   without the `P` macro as well
 
-val jNumber = (double.map(JNumber(_))!) withName "<jNumber>"
-//                     │
-//                     └ similar to `as`, but it consumes the result from the double parser
+  val jNumber = P{ double.map(JNumber(_))! }
+  //                        │
+  //                        └ similar to `as`, but it consumes the result from the double parser
 
-def jString = quoted().map(JString(_)) withName "<jString>"
+  def jString = P{ quoted().map(JString(_)) }
 
-def jArray : Parser[JValue] =
-  ('['!) >> (jValue sepBy ',').map(JArray(_)) << (']'!) withName "<jArray>"
-//                    │
-//                    └ matches `JValue` objects separated by `,` zero or more times and returns
-//                      the matched `JValue`s inside a `Vector`
+  def jArray : Parser[JValue] = 
+    P{ ('['!) >> (jValue sepBy ',').map(JArray(_)) << (']'!) }
+  //                       │
+  //                       └ matches `JValue` objects separated by `,` zero or more times and 
+  //                         returns the matched `JValue`s inside a `Vector`
 
-val jObjectKey = whitespaces >> quoted() << whitespaces withName "<jObjectKey>"
+  val jObjectKey = P{ whitespaces >> quoted() << whitespaces }
 
-def jObjectEntry : Parser[(String, JValue)] =
-  lift(jObjectKey << ":"!, jValue) withName "<jObjectEntry>"
-// │
-// └ combines two parsers `jObjectKey << ":"` and `jValue` and produce a parser that returns a
-//   tuple containing the parsed key string and `JValue` object.
+  def jObjectEntry : Parser[(String, JValue)] =
+    P{ lift(jObjectKey << ":"!, jValue) }
+  //    │
+  //    └ combines two parsers `jObjectKey << ":"` and `jValue` and produce a parser that returns a 
+  //      tuple containing the parsed key string and `JValue` object.
 
-def jObject : Parser[JValue] =
-  ('{'!) >>
-  (jObjectEntry sepBy ',').map(c => JObject(c.toMap))
-  << ('}'!) withName "<jObject>"
+  def jObject : Parser[JValue] = P {
+    ('{'!) >> 
+    (jObjectEntry sepBy ',').map(c => JObject(c.toMap))
+    << ('}'!) 
+  }
 
-def jValue : Parser[JValue] =
-  whitespaces >>
-  (jNull | jBoolean | jNumber | jString | jArray | jObject)
-  << whitespaces withName "<jValue>"
+  def jValue : Parser[JValue] = P {
+    whitespaces >> 
+    (jNull | jBoolean | jNumber | jString | jArray | jObject) 
+    << whitespaces
+  }
 
 jValue.parse("""[1, "a", {}]""") // JArray([JNumber(1), JString("a"), JObject({})])
 ```
@@ -188,3 +195,4 @@ For more examples, please refer to
 | 0.23-RC1 | 0.1.0                    |
 | 0.24-RC1 | 0.1.1                    |
 | 0.24-RC1 | 0.1.2                    |
+| 0.24-RC1 | 0.2.0                    |
