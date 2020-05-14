@@ -67,12 +67,15 @@ trait ParserT[-I, +T] {
     val result = parseImpl(input)
     result match {
       case Right(t) => Right(t)
-      case Left(e) => if (e != null && e.failureParser.kind == kind) {
-        // Skip ParserError e since it's from the same kind of parser of this one.
-        Left(ParserError(startPosition, this, e.cause))
-      } else {
-        Left(ParserError(startPosition, this, e))
-      }
+      case l@Left(e) => 
+        if (e != null && e.failureParser == this) {
+          Left(e)
+        } else if (e != null && e.failureParser.kind == kind) {
+          // Skip ParserError e since it's from the same kind of parser of this one.
+          Left(ParserError(startPosition, this, e.cause, e.message))
+        } else {
+          Left(ParserError(startPosition, this, e))
+        }
     }
   }
   /** Subclass should implement this to provide the parsing behavior. */
@@ -90,7 +93,8 @@ class ParserState[+I](val content: IndexedSeq[I], var position: Int, var commitP
 case class ParserError[-I](
   val position: Int,
   val failureParser: ParserT[I, ?],
-  val cause: ParserError[I] | Null) {
+  val cause: ParserError[I] | Null,
+  val message: String | Null = null) {
   override def toString() : String = {
     val failureParserName = failureParser.name()
     val failureParserDetail = failureParser.detail()
@@ -100,7 +104,11 @@ case class ParserError[-I](
       " := " + failureParserDetail
     }
     (if (cause == null) {
-      ""
+      if (message == null) {
+        ""
+      } else {
+        message + "\n"
+      }
     } else {
       cause.toString() + "\n"
     }) + s"$position: $failureParserName" + detail
@@ -202,7 +210,7 @@ def [I, T](p: ParserT[I, T]) withDetailFnAndKind(detailTransformer: String => St
   override def kind : Kind = newKind
   override def detailImpl = detailTransformer(p.detailImpl)
   override def parseImpl(input: ParserState[I]) : Either[ParserError[I] | Null, T] = p.parse(input) match {
-    case Left(ParserError(position, failureParser, cause)) => Left(cause)
+    case Left(ParserError(position, failureParser, cause, _)) => Left(cause)
     case t@_ => t
   }
 }
@@ -232,7 +240,7 @@ def [I, T](p: ParserT[I, T])unary_! = new ParserT[I, T] {
   override def parseImpl(input: ParserState[I]) : Either[ParserError[I], T] = {
     input.commitPosition = input.position
     p.parse(input) match {
-        case Left(ParserError(position, failureParser, cause)) => Left(ParserError(position, this, cause))
+        case Left(ParserError(position, failureParser, cause, _)) => Left(ParserError(position, this, cause))
         case t@_ => t
     }
   }
@@ -244,7 +252,7 @@ def [I, T](p: ParserT[I, T])! = new ParserT[I, T] {
   override def detailImpl = p.name(kind) + "!"
   override def parseImpl(input: ParserState[I]) : Either[ParserError[I], T] = {
     p.parse(input) match {
-        case Left(ParserError(position, failureParser, cause)) => Left(ParserError(position, this, cause))
+        case Left(ParserError(position, failureParser, cause, _)) => Left(ParserError(position, this, cause))
         case t@_ => {
           input.commitPosition = input.position
           t
@@ -418,6 +426,28 @@ def satisfy[I](predicate: I => Boolean) = new ParserT[I, I] {
       Left(ParserError(position, this, null))
     }
   }
+}
+
+/** Augment the given parser with a custom error message that is shown when
+ *  parsing failed.
+  */
+def [I, T](p: ParserT[I, T]) withErrorMessage(message: String) = new ParserT[I, T] {
+    override def kind : Kind = p.kind
+    override def detailImpl = p.detailImpl
+    override def parseImpl(input: ParserState[I]) : Either[ParserError[I] | Null, T] =
+      p.parse(input) match {
+        case r@Right(_) => r
+        case Left(e) => Left(ParserError(e.position, e.failureParser, e.cause, message))
+      }
+}
+
+private val failureKind = Kind(10, "fail")
+
+/** Fails parsing immediately with the given message. */
+def fail[I, T](msg: String) = new ParserT[I, T] {
+  override def kind : Kind = failureKind
+  override def detailImpl = "<failure>"
+  override def parseImpl(input: ParserState[I]) = Left(ParserError(input.position, this, null, msg))
 }
 
 /** Augment the given parser with additional predicate testing the parsed 

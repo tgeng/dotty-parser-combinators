@@ -432,6 +432,27 @@ class ParserTest {
     """
   }
 
+  @Test
+  def `test fail` = testing(fail("blah")) {
+    "" ~^ """
+      blah
+      0: <failure>
+    """
+    "yoo" ~^ """
+      blah
+      0: <failure>
+    """
+  }
+
+  @Test
+  def `test withErrorMessage` = testing("abc".rp.withErrorMessage("should match 'abc'")) {
+    "abc" ~> "abc"
+    "def" ~> """
+      should match 'abc'
+      0: /abc/
+    """
+  }
+
   @Test 
   def `test satisfying` = testing(".*".rp.satisfying(_ == "foo")) {
     "foo" ~> "foo"
