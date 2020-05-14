@@ -447,7 +447,7 @@ class ParserTest {
   @Test
   def `test withErrorMessage` = testing("abc".rp.withErrorMessage("should match 'abc'")) {
     "abc" ~> "abc"
-    "def" ~> """
+    "def" ~^ """
       should match 'abc'
       0: /abc/
     """
