@@ -55,7 +55,8 @@ def [I, T](p: ParserT[I, T])+ : ParserT[I, Vector[T]] = {
 /** Repeats the parser zero or one times and return an option of the result. */
 def [I, T](p: ParserT[I, T])? : ParserT[I, Option[T]] = {
   val kind = Kind(9, "?")
-  (p.map(Some[T]) | (nothing as None)) withDetailAndKind(
+  val ep = encapsulated(p)
+  (ep.map(Some[T]) | (nothing as None)) withDetailAndKind(
     p.name(kind) + "?",
     kind
   )

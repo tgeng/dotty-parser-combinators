@@ -222,7 +222,7 @@ private val encapsulatedKind = Kind(10, "encapsulated")
   */
 def encapsulated[I, T](p: ParserT[I, T]) = new ParserT[I, T] {
   override def kind : Kind = encapsulatedKind
-  override def detailImpl = s"{ ${p.name()} }"
+  override def detailImpl = s"{ ${p.detailImpl} }"
   override def parseImpl(input: ParserState[I]) : Either[ParserError[I], T] = {
     val commitPosition = input.commitPosition
     val result = p.parse(input);
@@ -354,6 +354,7 @@ def [I, T](p: ParserT[I, T]) & (cond: ParserT[I, Any]): ParserT[I, T] = new Pars
 
 /** Repeats the parser zero or more times and return all matches in a [[Vector]]. */
 def [I, T](p: ParserT[I, T])* = new ParserT[I, Vector[T]](){
+  private val ep = encapsulated(p)
   private val starKind = Kind(9, "*")
   override def kind : Kind = starKind
   override def detailImpl = p.name(kind) + "*"
@@ -361,7 +362,7 @@ def [I, T](p: ParserT[I, T])* = new ParserT[I, Vector[T]](){
     val result = ArrayBuffer[T]()
     while(true) {
       val startPosition = input.position
-      p.parse(input) match {
+      ep.parse(input) match {
         case Right(t) => result += t
         case Left(e) if (startPosition >= input.commitPosition) => {
           input.position = startPosition

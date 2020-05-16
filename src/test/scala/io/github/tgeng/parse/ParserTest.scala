@@ -91,15 +91,11 @@ class ParserTest {
 
   @Test
   def `commit operator and *` = {
-    val p = ":" >> !"\\w+".rp
+    val p = ":".! >> "\\w+".rp
     testing(p*) {
       ":abc" ~> Seq("abc")
       ":abc:def" ~> Seq("abc", "def" )
-      ":abc:?" ~^ """
-        5: !/\w+/
-        4: ":" >> !/\w+/
-        0: (":" >> !/\w+/)*
-      """
+      ":abc:?" ~> Seq("abc")
     }
   }
 
