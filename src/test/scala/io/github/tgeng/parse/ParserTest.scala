@@ -71,7 +71,9 @@ class ParserTest {
 
     testing(ab) {
       "ab" ~> "ab"
-      "a" ~> """
+      "a" ~^ """
+        1: "b"
+        0: <ab> := "a" "b"
       """
     }
   }

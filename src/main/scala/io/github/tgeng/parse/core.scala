@@ -185,11 +185,12 @@ def [I, T](p: => ParserT[I, T]) withStrongName(newName: String) : ParserT[I, T] 
 
 private def [I, T](p: => ParserT[I, T]) withNameAndDetail(newName: String, newDetail: String|Null, strong: Boolean = false) : ParserT[I, T] = new ParserT[I, T] {
   private val namedKind = Kind(10, "named", true)
+  private lazy val cachedP : ParserT[I, T] = p
   override def kind : Kind = namedKind
   override def name(parentKind: Kind): String = newName
-  override def detailImpl = if(newDetail == null) p.name() else newDetail
+  override def detailImpl = if(newDetail == null) cachedP.name() else newDetail
   override def parseImpl(input: ParserState[I]) =
-    p.parse(input) match {
+    cachedP.parse(input) match {
       case Left(e) => Left(if (strong) null else e)
       case r => r
     }
