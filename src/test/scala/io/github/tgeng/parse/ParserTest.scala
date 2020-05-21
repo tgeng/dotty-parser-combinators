@@ -61,6 +61,22 @@ class ParserTest {
   }
 
   @Test
+  def `for comprehension` = {
+    val ab = P {
+      for {
+        a <- "a"
+        b <- "b"
+      } yield a + b
+    }
+
+    testing(ab) {
+      "ab" ~> "ab"
+      "a" ~> """
+      """
+    }
+  }
+
+  @Test
   def `or operator` = {
     testing("a" | "b" | "c" | "d") {
       "a" ~> "a"
@@ -82,7 +98,7 @@ class ParserTest {
       "0xaaf" ~> "aaf"
       "0123" ~> "123"
       "0abc" ~^ """
-        1: !/[0-7]+/
+        1: /[0-7]+/
         0: oct := "0" >> !/[0-7]+/
         0: hex | oct | /.*/
       """
@@ -175,6 +191,7 @@ class ParserTest {
       "abc" ~> Seq("abc" )
       "abc,def" ~> Seq("abc", "def" )
       "~~" ~^ """
+        0: /\w+/
         0: word := /\w+/
         0: word sepBy1 ','
       """
@@ -189,8 +206,6 @@ class ParserTest {
       "ab,cd,ef,gh" ~> Seq("ab", "cd", "ef" )
       "ab,cd" ~^ """
         5: ','
-        5: ',' >> word
-        2: 2 * (',' >> word)
         0: word sepByN(3) ','
       """
     }
@@ -203,6 +218,7 @@ class ParserTest {
     "(abc)" ~> "abc"
     "(abc)def" ~> "abc"
     "()" ~^ """
+      1: /\w+/
       1: word := /\w+/
       0: '(' >> word << ')'
     """
@@ -419,11 +435,9 @@ class ParserTest {
     "'$t'" ~> "\t"
     "'$'quoted$$string$''" ~> "'quoted$string'"
     "abc" ~^ """
-      0: '''!
       0: <'-quoted>
     """
     "'abc" ~^ """
-      4: '''!
       0: <'-quoted>
     """
   }
@@ -460,11 +474,14 @@ class ParserTest {
   import JValue._
 
   //          ┌ a macro that names the parser according to the enclosing definition, For example, in
-  //          | this case, the created parser is named "<jNull>".
+  //          | this case, the created parser is named "<jNull>". `S` in `PS` is for strong name,
+  //          | which means the `jNull` parser will not report its internals in an error message. TO
+  //          | allow reporting internals, use `P` instead, as shown below with `jArray`, `jObject`,
+  //          | and `jObjectEntry`.
   //          |
   //          |         ┌────── as ─────┐
   //          |  ┌────  >> ────┐        │
-  val jNull = P{ ('n'!) >> "ull" as JNull }
+  val jNull = PS { ('n'!) >> "ull" as JNull }
   //              │  │        │           │
   //              │  │        │           └ give it a intuitive name so the error message is
   //              │  │        │             easier to understand
@@ -490,25 +507,25 @@ class ParserTest {
   //                                                 └ one could name the parser explicitly like so
   //                                                   without the `P` macro as well
 
-  val jNumber = P{ double.map(JNumber(_))! }
+  val jNumber = PS { double.map(JNumber(_))! }
   //                        │
   //                        └ similar to `as`, but it consumes the result from the double parser
 
-  def jString = P{ quoted().map(JString(_)) }
+  def jString = PS { quoted().map(JString(_)) }
 
   def jArray : Parser[JValue] = 
-    P{ ('['!) >> (jValue sepBy ',').map(JArray(_)) << (']'!) }
-  //                       │
-  //                       └ matches `JValue` objects separated by `,` zero or more times and 
-  //                         returns the matched `JValue`s inside a `Vector`
+    P { ('['!) >> (jValue sepBy ',').map(JArray(_)) << (']'!) }
+  //                        │
+  //                        └ matches `JValue` objects separated by `,` zero or more times and 
+  //                          returns the matched `JValue`s inside a `Vector`
 
-  val jObjectKey = P{ whitespaces >> quoted() << whitespaces }
+  val jObjectKey = PS { whitespaces >> quoted() << whitespaces }
 
   def jObjectEntry : Parser[(String, JValue)] =
-    P{ lift(jObjectKey << ":"!, jValue) }
-  //    │
-  //    └ combines two parsers `jObjectKey << ":"` and `jValue` and produce a parser that returns a 
-  //      tuple containing the parsed key string and `JValue` object.
+    P { lift(jObjectKey << ":"!, jValue) }
+  //     │
+  //     └ combines two parsers `jObjectKey << ":"` and `jValue` and produce a parser that returns a 
+  //       tuple containing the parsed key string and `JValue` object.
 
   def jObject : Parser[JValue] = P {
     ('{'!) >> 
@@ -545,9 +562,8 @@ class ParserTest {
       ))
 
     "blah" ~^ """
-      0: '{'!
+      0: '{'
       0: <jObject> := '{'! >> (<jObjectEntry> sepBy ',') << '}'!
-      0: <jNull> | <jBoolean> | <jNumber> | <jString> | <jArray> | <jObject>
       0: <jValue> := <whitespaces> >> (<jNull> | <jBoolean> | <jNumber> | <jString> | <jArray> | <jObject>) << <whitespaces>
     """
     
@@ -557,9 +573,8 @@ class ParserTest {
       "bar": "blah"
     }
     """ ~^ """
-      55: '}'!
+      55: '}'
       5: <jObject> := '{'! >> (<jObjectEntry> sepBy ',') << '}'!
-      5: <jNull> | <jBoolean> | <jNumber> | <jString> | <jArray> | <jObject>
       0: <jValue> := <whitespaces> >> (<jNull> | <jBoolean> | <jNumber> | <jString> | <jArray> | <jObject>) << <whitespaces>
     """
   }

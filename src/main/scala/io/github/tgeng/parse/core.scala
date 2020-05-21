@@ -21,21 +21,15 @@ import scala.collection.mutable.ArrayBuffer
   * * p2 | (p3 & p4)
   * * p1 | p2 | (p3 & p4)
   *
-  * This is redundant so what is actually printed is as follow.
-  *
-  * * p3
-  * * p3 & p4
-  * * p1 | p2 | (p3 & p4)
-  *
-  * That is, because the nested parsers `p1 | (p2 ...)` and `p2 | (p3 ...)` are
-  * of the same [[orKind]], they are "squashed" together in the error message.
+  * This is redundant. To give user the control, [[Kind]] has a retain property
+  * that determines if the parser should be retained in the error.
   */
-class Kind(val precedence: Double, val name: String)
+class Kind(val precedence: Double, val name: String, val retain: Boolean)
 
 /** The [[Kind]] to use when getting the string representation of the outmost
   * parser.
   */
-val rootKind = Kind(Double.NegativeInfinity, "root")
+val rootKind = Kind(Double.NegativeInfinity, "root", false)
 
 /** A generic parser.
   * 
@@ -57,6 +51,7 @@ trait ParserT[-I, +T] {
     * what this parser does.
     */
   def detailImpl : String
+  def message : String | Null = null
 
   /** Parses the given input. */
   final def parse(input: IndexedSeq[I]) : Either[ParserError[I], T] = parse(ParserState(input, 0, 0))
@@ -68,17 +63,15 @@ trait ParserT[-I, +T] {
     result match {
       case Right(t) => Right(t)
       case l@Left(e) => 
-        if (e != null && e.failureParser == this) {
-          Left(e)
-        } else if (e != null && e.failureParser.kind == kind) {
-          // Skip ParserError e since it's from the same kind of parser of this one.
-          Left(ParserError(startPosition, this, e.cause, e.message))
-        } else {
-          Left(ParserError(startPosition, this, e))
-        }
+        if (e != null && (!e.failureParser.kind.retain || e.failureParser.kind == kind)) Left(ParserError(startPosition, this, e.cause, message))
+        else Left(ParserError(startPosition, this, e, message))
     }
   }
-  /** Subclass should implement this to provide the parsing behavior. */
+  /** Subclass should implement this to provide the parsing behavior.
+    *
+    * On parsing failure, the returned [[ParserError]] should be the cause of
+    * the current parsing failure. If there is no cause, simply return null.
+    */
   protected def parseImpl(input: ParserState[I]) : Either[ParserError[I] | Null, T]
 
   override def toString() = s"Parser{${name()}}"
@@ -115,7 +108,7 @@ case class ParserError[-I](
   }
 }
 
-private def pureKind = Kind(10, "pure")
+private def pureKind = Kind(10, "pure", false)
 
 /** Parser that does not consume any input and simply return the given output.
   *
@@ -143,7 +136,7 @@ def [I, T, R](p: ParserT[I, T]) map(f: T => R): ParserT[I, R] = {
   }
 }
 
-private val flatMapKind = Kind(5, "flatMap")
+private val flatMapKind = Kind(5, "flatMap", false)
 
 /** Converts the given parser to another parser that depends on the result of
   * the input parser∷
@@ -188,13 +181,18 @@ def [I, T](p: => ParserT[I, T]) withName(newName: String) : ParserT[I, T] =
   * input parser.
   */
 def [I, T](p: => ParserT[I, T]) withStrongName(newName: String) : ParserT[I, T] =
-   p.withNameAndDetail(newName, newName)
+   p.withNameAndDetail(newName, newName, true)
 
-private def [I, T](p: => ParserT[I, T]) withNameAndDetail(newName: String, newDetail: String|Null) : ParserT[I, T] = new ParserT[I, T] {
-  override def kind : Kind = p.kind
+private def [I, T](p: => ParserT[I, T]) withNameAndDetail(newName: String, newDetail: String|Null, strong: Boolean = false) : ParserT[I, T] = new ParserT[I, T] {
+  private val namedKind = Kind(10, "named", true)
+  override def kind : Kind = namedKind
   override def name(parentKind: Kind): String = newName
-  override def detailImpl = if(newDetail == null) p.detailImpl else newDetail
-  override def parseImpl(input: ParserState[I]) = p.parse(input)
+  override def detailImpl = if(newDetail == null) p.name() else newDetail
+  override def parseImpl(input: ParserState[I]) =
+    p.parse(input) match {
+      case Left(e) => Left(if (strong) null else e)
+      case r => r
+    }
 }
 
 /** Gives the input parser a different detail message and kind. */
@@ -209,13 +207,10 @@ def [I, T](p: ParserT[I, T]) withDetailAndKind(newDetail: String, newKind: Kind)
 def [I, T](p: ParserT[I, T]) withDetailFnAndKind(detailTransformer: String => String, newKind : Kind) : ParserT[I, T] = new ParserT[I, T] {
   override def kind : Kind = newKind
   override def detailImpl = detailTransformer(p.detailImpl)
-  override def parseImpl(input: ParserState[I]) : Either[ParserError[I] | Null, T] = p.parse(input) match {
-    case Left(ParserError(position, failureParser, cause, _)) => Left(cause)
-    case t@_ => t
-  }
+  override def parseImpl(input: ParserState[I]) : Either[ParserError[I] | Null, T] = p.parse(input)
 }
 
-private val encapsulatedKind = Kind(10, "encapsulated")
+private val encapsulatedKind = Kind(10, "encapsulated", false)
 
 /** Encapsulates the input parser so that the effect of committing won't leak
   * to wrapping parsers.
@@ -231,7 +226,7 @@ def encapsulated[I, T](p: ParserT[I, T]) = new ParserT[I, T] {
   }
 }
 
-private val commitToKind = Kind(10, "!")
+private val commitToKind = Kind(10, "!", false)
 
 /** Commit to the right of this parser. See doc of [[|]] for details. */
 def [I, T](p: ParserT[I, T])unary_! = new ParserT[I, T] {
@@ -239,10 +234,7 @@ def [I, T](p: ParserT[I, T])unary_! = new ParserT[I, T] {
   override def detailImpl = "!" + p.name(kind)
   override def parseImpl(input: ParserState[I]) : Either[ParserError[I], T] = {
     input.commitPosition = input.position
-    p.parse(input) match {
-        case Left(ParserError(position, failureParser, cause, _)) => Left(ParserError(position, this, cause))
-        case t@_ => t
-    }
+    p.parse(input)
   }
 }
 
@@ -252,7 +244,7 @@ def [I, T](p: ParserT[I, T])! = new ParserT[I, T] {
   override def detailImpl = p.name(kind) + "!"
   override def parseImpl(input: ParserState[I]) : Either[ParserError[I], T] = {
     p.parse(input) match {
-        case Left(ParserError(position, failureParser, cause, _)) => Left(ParserError(position, this, cause))
+        case Left(e) => Left(e)
         case t@_ => {
           input.commitPosition = input.position
           t
@@ -261,7 +253,7 @@ def [I, T](p: ParserT[I, T])! = new ParserT[I, T] {
   }
 }
 
-private val notKind = Kind(5, "not")
+private val notKind = Kind(5, "not", true)
 
 /** Negates the input parser
   * 
@@ -286,7 +278,7 @@ def not[I](p: ParserT[I, ?]) = new ParserT[I, Unit] {
   }
 }
 
-private val orKind = Kind(1, "|")
+private val orKind = Kind(1, "|", false)
 
 /** Or combinator.
   * 
@@ -319,7 +311,7 @@ def [I, T](p1: ParserT[I, T]) | (p2: ParserT[I, T]) : ParserT[I, T] = new Parser
   }
 }
 
-private val andKind = Kind(2, "&")
+private val andKind = Kind(2, "&", false)
 
 /** And combinator.
   *
@@ -355,7 +347,7 @@ def [I, T](p: ParserT[I, T]) & (cond: ParserT[I, Any]): ParserT[I, T] = new Pars
 /** Repeats the parser zero or more times and return all matches in a [[Vector]]. */
 def [I, T](p: ParserT[I, T])* = new ParserT[I, Vector[T]](){
   private val ep = encapsulated(p)
-  private val starKind = Kind(9, "*")
+  private val starKind = Kind(9, "*", false)
   override def kind : Kind = starKind
   override def detailImpl = p.name(kind) + "*"
   override def parseImpl(input: ParserState[I]) : Either[ParserError[I], Vector[T]] = {
@@ -379,7 +371,7 @@ def [I, T](p: ParserT[I, T])* = new ParserT[I, Vector[T]](){
   * in a [[Vector]].
   */
 def [I, T](count: Int) *(p: ParserT[I, T]) = new ParserT[I, Vector[T]] {
-  private val repeatKind = Kind(8, "n*_")
+  private val repeatKind = Kind(8, "n*_", false)
   override def kind : Kind = repeatKind
   override def detailImpl = s"$count * " + p.name(kind)
   override def parseImpl(input: ParserState[I]) : Either[ParserError[I], Vector[T]] = {
@@ -390,14 +382,14 @@ def [I, T](count: Int) *(p: ParserT[I, T]) = new ParserT[I, Vector[T]] {
       i += 1
       p.parse(input) match {
         case Right(t) => result += t
-        case Left(e) => return Left(ParserError(position, this, e))
+        case Left(e) => return Left(e)
       }
     }
     Right(result.toVector)
   }
 }
 
-private def positionKind = Kind(10, "position")
+private def positionKind = Kind(10, "position", true)
 
 /** Special parser that returns the current parsing position. */
 val position = new ParserT[Any, Int] {
@@ -406,7 +398,7 @@ val position = new ParserT[Any, Int] {
   override def parseImpl(input: ParserState[Any]) = Right(input.position)
 }
 
-private val predicateKind = Kind(10, "satisfy")
+private val predicateKind = Kind(10, "satisfy", true)
 
 /** Simple parser that succeeds if the current parser input matches the given 
   * predicate.
@@ -417,14 +409,14 @@ def satisfy[I](predicate: I => Boolean) = new ParserT[I, I] {
   override def parseImpl(input: ParserState[I]) = {
     val position = input.position
     if (position >= input.content.size) {
-      return Left(ParserError(position, this, null))
+      return Left(null)
     }
     val t = input.content(position)
     input.position += 1
     if (predicate(t)) {
       Right(t)
     } else {
-      Left(ParserError(position, this, null))
+      Left(null)
     }
   }
 }
@@ -432,23 +424,21 @@ def satisfy[I](predicate: I => Boolean) = new ParserT[I, I] {
 /** Augment the given parser with a custom error message that is shown when
  *  parsing failed.
   */
-def [I, T](p: ParserT[I, T]) withErrorMessage(message: String) = new ParserT[I, T] {
+def [I, T](p: ParserT[I, T]) withErrorMessage(aMessage: String) = new ParserT[I, T] {
+    override def message = aMessage
     override def kind : Kind = p.kind
     override def detailImpl = p.detailImpl
-    override def parseImpl(input: ParserState[I]) : Either[ParserError[I] | Null, T] =
-      p.parse(input) match {
-        case r@Right(_) => r
-        case Left(e) => Left(ParserError(e.position, e.failureParser, e.cause, message))
-      }
+    override def parseImpl(input: ParserState[I]) : Either[ParserError[I] | Null, T] = p.parse(input)
 }
 
-private val failureKind = Kind(10, "fail")
+private val failureKind = Kind(10, "fail", true)
 
 /** Fails parsing immediately with the given message. */
 def fail[I, T](msg: String) = new ParserT[I, T] {
+  override def message = msg
   override def kind : Kind = failureKind
   override def detailImpl = "<failure>"
-  override def parseImpl(input: ParserState[I]) = Left(ParserError(input.position, this, null, msg))
+  override def parseImpl(input: ParserState[I]) = Left(null)
 }
 
 /** Augment the given parser with additional predicate testing the parsed 
@@ -462,25 +452,28 @@ def [I, T](p: ParserT[I, T]) satisfying(predicate: T => Boolean, predicateName: 
       p.parse(input).flatMap{ t =>
         predicate(t) match {
           case true => Right(t)
-          case false => Left(ParserError(position, this, null))
+          case false => Left(null)
         }
       }
 }
 
-/** Facilitates implicit conversion when needed. */
-inline def parser[I, T](p: ParserT[I, T]) = p
-
-/** Facilitates implicit conversion. In addition name the parser with the
+/** Facilitates implicit conversion. In addition, name the parser with the
   * enclosing definition automatically. For example
   *  
   * {{{
-  * scala> val keyword = P{ "def" | "val" }
+  * scala> val keyword = PS { "def" | "val" }
   * val keyword: io.github.tgeng.parse.ParserT[Char, String] = Parser{keyword}
   * }}}
   * 
   */
 inline def P[I, T](inline parser: => ParserT[I, T]) : ParserT[I, T] = 
-  parser.withNameAndDetail("<" + enclosingName(parser) + ">", null)
+  parser withName "<" + enclosingName(parser) + ">"
+
+/** Facilitates implicit conversion. Similarly to the above, but name the parser
+  * with strong name.
+  */
+inline def PS[I, T](inline parser: => ParserT[I, T]) : ParserT[I, T] = 
+  parser withStrongName "<" + enclosingName(parser) + ">"
 
 
 private inline def enclosingName(inline e: Any): String = ${

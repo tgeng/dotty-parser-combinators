@@ -9,13 +9,13 @@ def [I, R](p: ParserT[I, ?]) as(r: R) : ParserT[I, R] = p.map(_ => r)
 val nothing: ParserT[Any, Unit] = pure(()) withStrongName "<nothing>"
 
 /** Matches any input token and returns it. */
-def any[I] : ParserT[I, I] = satisfy[I](_ => true) withStrongName "<any>"
+def any[I] : ParserT[I, I] = PS { satisfy[I](_ => true) }
 
 /** Matches the end of the input. */
 val eof : ParserT[Any, Unit] = not(any) withStrongName "<eof>"
 
 /** Skips the current token. */
-val skip : ParserT[Any, Unit] = satisfy[Any](_ => true).as(()) withStrongName "<skip>"
+val skip : ParserT[Any, Unit] = PS { satisfy[Any](_ => true).as(()) }
 
 /** Matches any of the given [[candidates]]. */
 def anyOf[I](candidates : Seq[I]) : ParserT[I, I] = 
@@ -25,7 +25,7 @@ def anyOf[I](candidates : Seq[I]) : ParserT[I, I] =
 def anyOf[I](candidates : Set[I]) : ParserT[I, I] = 
   satisfy[I](candidates.contains(_)) withStrongName s"<anyOf{${candidates.mkString(", ")}}>"
 
-val prefixSuffixKind = Kind(4, "prefixSuffix")
+val prefixSuffixKind = Kind(4, "prefixSuffix", false)
 
 /** Matches [[p1]] and [[p2]] and outputs result of [[p2]]. */
 def [I, T](p1: ParserT[I, ?]) >> (p2: ParserT[I, T]) : ParserT[I, T] = (for {
@@ -45,7 +45,7 @@ def [I, T](p1: ParserT[I, T]) << (p2: ParserT[I, ?]) : ParserT[I, T] = (for {
 
 /** Repeats the parser one or more times and return all matches in a [[Vector]]. */
 def [I, T](p: ParserT[I, T])+ : ParserT[I, Vector[T]] = {
-  val kind = Kind(9, "+")
+  val kind = Kind(9, "+", false)
   (for {
   t <- p
   ts <- p*
@@ -54,7 +54,7 @@ def [I, T](p: ParserT[I, T])+ : ParserT[I, Vector[T]] = {
 
 /** Repeats the parser zero or one times and return an option of the result. */
 def [I, T](p: ParserT[I, T])? : ParserT[I, Option[T]] = {
-  val kind = Kind(9, "?")
+  val kind = Kind(9, "?", false)
   val ep = encapsulated(p)
   (ep.map(Some[T]) | (nothing as None)) withDetailAndKind(
     p.name(kind) + "?",
@@ -64,7 +64,7 @@ def [I, T](p: ParserT[I, T])? : ParserT[I, Option[T]] = {
 
 /** Parses [[p]] repeatedly at once, separated by [[s]]. */
 def [I, T](p: ParserT[I, T]) sepBy1 (s: ParserT[I, ?]) : ParserT[I, Vector[T]] = {
-  val sepKind = Kind(0, "sepBy1")
+  val sepKind = Kind(0, "sepBy1", false)
   p +: ((s >> p)*) withDetailAndKind (
   s"${p.name(sepKind)} sepBy1 ${s.name(sepKind)}",
   sepKind)
@@ -72,7 +72,7 @@ def [I, T](p: ParserT[I, T]) sepBy1 (s: ParserT[I, ?]) : ParserT[I, Vector[T]] =
 
 /** Parses [[p]] repeatedly at zero or more times, separated by [[s]]. */
 def [I, T](p: ParserT[I, T]) sepBy (s: ParserT[I, ?]) : ParserT[I, Vector[T]] = {
-  val sepKind = Kind(0, "sepBy")
+  val sepKind = Kind(0, "sepBy", false)
   (p.sepBy1(s) | (nothing as Vector.empty)) withDetailAndKind (
   s"${p.name(sepKind)} sepBy ${s.name(sepKind)}",
   sepKind)
@@ -82,7 +82,7 @@ def [I, T](p: ParserT[I, T]) sepBy (s: ParserT[I, ?]) : ParserT[I, Vector[T]] = 
   * [[s]].
   */
 def [I, T](p: ParserT[I, T]) sepByN (count: Int) (s: ParserT[I, ?]) : ParserT[I, Vector[T]] = {
-  val sepKind = Kind(0, "sepByN")
+  val sepKind = Kind(0, "sepByN", false)
   count match {
     case 0 => nothing as Vector.empty[T]
     case 1 => p.map(Vector[T](_))
@@ -97,7 +97,7 @@ def [I, T](p: ParserT[I, T]) sepByN (count: Int) (s: ParserT[I, ?]) : ParserT[I,
   * Function application starts from results on the left.
   */
 def [I, T](elemParser: ParserT[I, T]) chainedLeftBy(opParser: ParserT[I, (T, T) => T]) : ParserT[I, T] = {
-  val chainKind = Kind(0, "chainedLeftBy")
+  val chainKind = Kind(0, "chainedLeftBy", false)
   foldLeft(elemParser, opParser, elemParser)
   .withDetailAndKind(
     s"${elemParser.name(chainKind)} chainedLeftBy ${opParser.name(chainKind)}",
@@ -109,7 +109,7 @@ def [I, T](elemParser: ParserT[I, T]) chainedLeftBy(opParser: ParserT[I, (T, T) 
   * Function application starts from results on the right.
   */
 def [I, T](elemParser: ParserT[I, T]) chainedRightBy(opParser: ParserT[I, (T, T) => T]) : ParserT[I, T] = {
-  val chainKind = Kind(0, "chainedLeftBy")
+  val chainKind = Kind(0, "chainedLeftBy", false)
   foldRight(elemParser, opParser, elemParser)
   .withDetailAndKind(
   s"${elemParser.name(chainKind)} chainedRightBy ${opParser.name(chainKind)}",
@@ -118,7 +118,7 @@ def [I, T](elemParser: ParserT[I, T]) chainedRightBy(opParser: ParserT[I, (T, T)
 
 /** Folds results from the given parsers. Just like the standard fold-left operation. */
 def foldLeft[I, L, R](accParser: ParserT[I, L], opParser: ParserT[I, (L, R) => L], elemParser: ParserT[I, R]) : ParserT[I, L] = {
-  val foldKind = Kind(10, "foldLeft")
+  val foldKind = Kind(10, "foldLeft", false)
   (for {
     first <- accParser
     rest <- (for {
@@ -132,7 +132,7 @@ def foldLeft[I, L, R](accParser: ParserT[I, L], opParser: ParserT[I, (L, R) => L
 
 /** Folds results from the given parsers. Just like the standard fold-right operation. */
 def foldRight[I, L, R](elemParser: ParserT[I, L], opParser: ParserT[I, (L, R) => R], accParser: ParserT[I, R]) : ParserT[I, R] = {
-  val foldKind = Kind(10, "foldRight")
+  val foldKind = Kind(10, "foldRight", false)
   (for {
     front <- ((for {
       elem <- elemParser
@@ -144,7 +144,7 @@ def foldRight[I, L, R](elemParser: ParserT[I, L], opParser: ParserT[I, (L, R) =>
     foldKind)
 }
 
-def applyKind = Kind(10, "apply")
+def applyKind = Kind(10, "apply", false)
 
 /** Applies the function resulted from [[fP]] with the argument resulted from 
   * [[arg1P]]. 
@@ -206,7 +206,7 @@ def [I, F1, F2, F3, F4, T](fnP: ParserT[I, (F1, F2, F3, F4) => T])<*>(
   s"${fnP.name(applyKind)} <*> (${arg1P.name()}, ${arg2P.name()}, ${arg3P.name()}, ${arg4P.name()})",
   applyKind)
 
-val prependAppendConcat = Kind(7, "prependAppendConcat")
+val prependAppendConcat = Kind(7, "prependAppendConcat", false)
 
 /** Combine the result of two parsers and put them into a [[Vector]]. */
 def [I, T](p1: ParserT[I, T]) +:+ (p2: ParserT[I, T]) : ParserT[I, Vector[T]] = (for {
@@ -240,6 +240,8 @@ def [I, T, CC[_], C <: scala.collection.IterableOps[T, CC, C]](p1: ParserT[I, C]
   s"${p1.name(prependAppendConcat)} ++ ${p2.name(prependAppendConcat)}",
   prependAppendConcat)
 
+val liftKind = Kind(10, "lift", false)
+
 def  lift[I, T, CC[_], C <: scala.collection.SeqOps[ParserT[I, T], CC, C]](parsers: C) : ParserT[I, CC[T]] =
   parsers.foldLeft(
       // I could not figure out how to create an empty CC[T] without using this
@@ -248,23 +250,25 @@ def  lift[I, T, CC[_], C <: scala.collection.SeqOps[ParserT[I, T], CC, C]](parse
     )(
       // Sadly CC[T] is too weak here to call `:+` defined above. So we force
       // cast and cast back.
-      (acc, e) => (acc.asInstanceOf[ParserT[I, Seq[T]]] :+ e).asInstanceOf[ParserT[I, CC[T]]]) withStrongName 
-        s"lift{${parsers.toSeq.map(_.name()).mkString(", ")}}"
+      (acc, e) => (acc.asInstanceOf[ParserT[I, Seq[T]]] :+ e).asInstanceOf[ParserT[I, CC[T]]]).withDetailAndKind(
+        s"lift{${parsers.toSeq.map(_.name()).mkString(", ")}}",
+        liftKind
+      )
 
 def lift[I, A, B](tuple: (ParserT[I, A], ParserT[I, B])) : ParserT[I, (A, B)] = (for {
   a <- tuple._1
   b <- tuple._2
-} yield (a, b)) withStrongName s"(${tuple._1.name()}, ${tuple._2.name()})"
+} yield (a, b)).withDetailAndKind(s"(${tuple._1.name()}, ${tuple._2.name()})", liftKind)
 
 def lift[I, A, B, C](tuple: (ParserT[I, A], ParserT[I, B], ParserT[I, C])) : ParserT[I, (A, B, C)] = (for {
   a <- tuple._1
   b <- tuple._2
   c <- tuple._3
-} yield (a, b, c)) withStrongName s"(${tuple._1.name()}, ${tuple._2.name()}, ${tuple._3.name()})"
+} yield (a, b, c)).withDetailAndKind(s"(${tuple._1.name()}, ${tuple._2.name()}, ${tuple._3.name()})", liftKind)
 
 def lift[I, A, B, C, D](tuple: (ParserT[I, A], ParserT[I, B], ParserT[I, C], ParserT[I, D])) : ParserT[I, (A, B, C, D)] = (for {
   a <- tuple._1
   b <- tuple._2
   c <- tuple._3
   d <- tuple._4
-} yield (a, b, c, d)) withStrongName s"(${tuple._1.name()}, ${tuple._2.name()}, ${tuple._3.name()}, ${tuple._4.name()})"
+} yield (a, b, c, d)).withDetailAndKind(s"(${tuple._1.name()}, ${tuple._2.name()}, ${tuple._3.name()}, ${tuple._4.name()})", liftKind)

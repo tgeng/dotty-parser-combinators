@@ -8,35 +8,35 @@ object string {
 
   type Parser[T] = ParserT[Char, T]
 
-  private val regexKind = Kind(10, "regex")
+  private val regexKind = Kind(10, "regex", true)
 
   /** Converts a regex to a parser. */
   given parserMatchingRegex as Conversion[Regex, Parser[Match]] = (r: Regex) => new Parser[Match] {
     override def kind : Kind = regexKind
     override def detailImpl = s"/$r/"
-    override def parseImpl(input: ParserState[Char]) : Either[ParserError[Char], Match] = {
+    override def parseImpl(input: ParserState[Char]) : Either[ParserError[Char] | Null, Match] = {
       r.findPrefixMatchOf(input.content.slice(input.position, input.content.length)) match {
         case Some(regexMatch) => {
           input.position += regexMatch.matched.length
           Right(regexMatch)
         }
-        case None => Left(ParserError(input.position, this, null))
+        case None => Left(null)
       }
     }
   }
 
-  private val stringKind = Kind(10, "string")
+  private val stringKind = Kind(10, "string", true)
 
   /** Converts a string to a parser that matches the string and returns it. */
   given parserMatchingString as Conversion[String, Parser[String]] = (s: String) => new Parser[String] {
     override def kind : Kind = stringKind
     override def detailImpl = "\"" + s + "\""
-    override def parseImpl(input: ParserState[Char]) : Either[ParserError[Char], String] = {
+    override def parseImpl(input: ParserState[Char]) : Either[ParserError[Char] | Null, String] = {
       if (input.content.slice(input.position, input.position + s.length) startsWith s) {
         input.position += s.length
         Right(s)
       } else {
-        Left(ParserError(input.position, this, null))
+        Left(null)
       }
     }
   }
@@ -58,23 +58,23 @@ object string {
 
   def charSatisfy(predicate: Char => Boolean) : Parser[Char] = satisfy(predicate)
 
-  val space : Parser[Char] = charSatisfy(_ == ' ') withStrongName "<space>"
-  val spaces : Parser[String] = (space*).map(_.mkString("")) withStrongName "<spaces>"
-  val whitespace : Parser[Char] = satisfy(Character.isWhitespace) withStrongName "<whitespace>"
-  val whitespaces : Parser[String] = (whitespace*).map(_.mkString("")) withStrongName "<whitespaces>"
+  val space : Parser[Char] = PS { charSatisfy(_ == ' ') }
+  val spaces : Parser[String] = PS { (space*).map(_.mkString("")) }
+  val whitespace : Parser[Char] = PS { satisfy(Character.isWhitespace) }
+  val whitespaces : Parser[String] = PS { (whitespace*).map(_.mkString("")) }
 
-  val lf : Parser[Char] = charSatisfy(_ == '\n') withStrongName "<lf>"
-  val cr : Parser[Char] = charSatisfy(_ == '\r') withStrongName "<cr>"
-  val crlf : Parser[String] = cr >> lf as "\r\n" withStrongName "<crlf>"
+  val lf : Parser[Char] = PS { charSatisfy(_ == '\n') }
+  val cr : Parser[Char] = PS { charSatisfy(_ == '\r') }
+  val crlf : Parser[String] = PS { cr >> lf as "\r\n" }
 
-  val upper : Parser[Char] = satisfy(Character.isUpperCase) withStrongName "<upper>"
-  val lower : Parser[Char] = satisfy(Character.isLowerCase) withStrongName "<lower>"
-  val letter : Parser[Char]= satisfy(Character.isLetter) withStrongName "<letter>"
-  val digit : Parser[Char] = satisfy(Character.isDigit) withStrongName "<digit>"
-  val alphaNum : Parser[Char] = satisfy((c: Char) => Character.isAlphabetic(c.toInt) || Character.isDigit(c)) withStrongName "<alphanum>"
+  val upper : Parser[Char] = PS { satisfy(Character.isUpperCase) }
+  val lower : Parser[Char] = PS { satisfy(Character.isLowerCase) }
+  val letter : Parser[Char]= PS { satisfy(Character.isLetter) }
+  val digit : Parser[Char] = PS { satisfy(Character.isDigit) }
+  val alphaNum : Parser[Char] = PS { satisfy((c: Char) => Character.isAlphabetic(c.toInt) || Character.isDigit(c)) }
 
-  val int : Parser[Int] = "[-+]?[0-9]+".rp.map(_.toInt) withStrongName "<int>"
-  val double : Parser[Double] = "[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)".rp.map(_.toDouble) withStrongName "<double>"
+  val int : Parser[Int] = PS { "[-+]?[0-9]+".rp.map(_.toInt) }
+  val double : Parser[Double] = PS { "[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)".rp.map(_.toDouble) }
 
   def quoted(
       quoteSymbol: Char = '"', 
