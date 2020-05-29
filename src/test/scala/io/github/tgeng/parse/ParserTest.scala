@@ -92,8 +92,8 @@ class ParserTest {
 
   @Test
   def `commit operator and |` = {
-    val oct = "0" >> !"[0-7]+".rp withName "oct"
-    val hex = "0x" >> !"[0-9a-f]+".rp withName "hex"
+    val oct = "0" >> commitBefore("[0-7]+".rp) withName "oct"
+    val hex = "0x" >> commitBefore("[0-9a-f]+".rp) withName "hex"
     val octOrHex = hex | oct | ".*".rp
 
     testing(octOrHex) {
@@ -109,7 +109,7 @@ class ParserTest {
 
   @Test
   def `commit operator and *` = {
-    val p = ":".! >> "\\w+".rp
+    val p = ":" >>! "\\w+".rp
     testing(p*) {
       ":abc" ~> Seq("abc")
       ":abc:def" ~> Seq("abc", "def" )
@@ -120,15 +120,15 @@ class ParserTest {
   @Test
   def `not operator` = {
     val alphabet = satisfy[Char](Character.isAlphabetic(_))
-    val keyword = ("def" | "class" | "val") << not(!alphabet)
+    val keyword = ("def" | "class" | "val") << not(alphabet)
 
     testing(keyword) {
       "def" ~> "def"
       "class" ~> "class"
       "val" ~> "val"
       "definition" ~^ """
-        3: not !<satisfy>
-        0: ("def" | "class" | "val") << not !<satisfy>
+        3: not <satisfy>
+        0: ("def" | "class" | "val") << not <satisfy>
       """
     }
   }
@@ -137,7 +137,7 @@ class ParserTest {
   def `and operator` = {
     val alphabet = satisfy[Char](Character.isAlphabetic(_)) withName "alphabet"
     val digit = satisfy[Char](Character.isDigit(_)) withName "digit"
-    val keyword = ("def" | "class" | "val") << not(!alphabet) withName "keyword"
+    val keyword = ("def" | "class" | "val") << not(alphabet) withName "keyword"
     val identifier = "\\w+".rp & not(keyword) & not(digit) // not starting with digit
 
     testing(identifier) {
@@ -333,10 +333,10 @@ class ParserTest {
   @Test
   def `calculator` = {
     val spaces = p(' ')*
-    val plus = ('+'!) as ((a: Double, b: Double) => a + b) withName "+"
-    val minus = ('-'!) as ((a: Double, b: Double) => a - b) withName "-"
-    val multiply = ('*'!) as ((a: Double, b: Double) => a * b) withName "*"
-    val divide = ('/'!) as ((a: Double, b: Double) => a / b) withName "/"
+    val plus = commitAfter('+') as ((a: Double, b: Double) => a + b) withName "+"
+    val minus = commitAfter('-') as ((a: Double, b: Double) => a - b) withName "-"
+    val multiply = commitAfter('*') as ((a: Double, b: Double) => a * b) withName "*"
+    val divide = commitAfter('/') as ((a: Double, b: Double) => a / b) withName "/"
 
     def sumExpr: Parser[Double] =
       prodExpr.chainedLeftBy(spaces >> (plus | minus) << spaces) withName "sumExpr"
@@ -481,58 +481,58 @@ class ParserTest {
   //          | allow reporting internals, use `P` instead, as shown below with `jArray`, `jObject`,
   //          | and `jObjectEntry`.
   //          |
-  //          |         ┌────── as ─────┐
-  //          |  ┌────  >> ────┐        │
-  val jNull = PS { ('n'!) >> "ull" as JNull }
-  //              │  │        │           │
-  //              │  │        │           └ give it a intuitive name so the error message is
-  //              │  │        │             easier to understand
-  //              │  │        │
-  //              │  │        └ convert the string parser returning "ull" to a parser returning
-  //              │  │          `JNull`
-  //              │  │
-  //              │  └ throw away result from the first parser, which matches 'n', and return
-  //              │    the result of the second parser, which, in this case, returns "ull"
-  //              │
-  //              └ commit right after seeing 'n' to speed up parsing failure in case 'n' is 
-  //                followed by things other than "ull". Without committing, the parser would keep 
-  //                trying <jBoolean>, <jNumber>, and so on.
+  //          |         ┌───── as ────┐
+  //          |  ┌───  >> ───┐        │
+  val jNull = PS { 'n' >>! "ull" as JNull }
+  //                    │        │    │
+  //                    │        │    └ give it a intuitive name so the error message is
+  //                    │        │      easier to understand
+  //                    │        │
+  //                    │        └ convert the string parser returning "ull" to a parser returning
+  //                    │          `JNull`
+  //                    │
+  //                    └ throw away result from the first parser, which matches 'n', and return
+  //                      the result of the second parser, which, in this case, returns "ull". In
+  //                      addition, commit right after seeing 'n' to speed up parsing failure in
+  //                      case 'n' is followed by things other than "ull". Without committing, the
+  //                      parser would keep trying <jBoolean>, <jNumber>, and so on.
+  //                
+  //                
 
-  //                     ┌ one can also commit right before a parser
-  //                     │                          
-  //                     │                         ┌ if matching "true" fails, try the following
-  //                     │                         │ to match false
-  //                     │                         │
-  def jBoolean = ('t' >> !"rue" as JBoolean(true)) | 
-                 ('f' >> !"alse" as JBoolean(false)) withName "<jBoolean>"
+  //                                               ┌ if matching "true" fails, try the following
+  //                                               │ to match false
+  //                                               │
+  def jBoolean = ('t' >>! "rue" as JBoolean(true)) | 
+                 ('f' >>! "alse" as JBoolean(false)) withName "<jBoolean>"
   //                                                 |
   //                                                 └ one could name the parser explicitly like so
   //                                                   without the `P` macro as well
 
-  val jNumber = PS { double.map(JNumber(_))! }
-  //                        │
-  //                        └ similar to `as`, but it consumes the result from the double parser
+  val jNumber = PS { commitAfter(double.map(JNumber(_))) }
+  //                                     │
+  //                                     └ similar to `as`, but it consumes the result from the 
+  //                                       double parser
 
   def jString = PS { quoted().map(JString(_)) }
 
   def jArray : Parser[JValue] = 
-    P { ('['!) >> (jValue sepBy ',').map(JArray(_)) << (']'!) }
-  //                        │
-  //                        └ matches `JValue` objects separated by `,` zero or more times and 
-  //                          returns the matched `JValue`s inside a `Vector`
+    P { '[' >>! (jValue sepBy ',').map(JArray(_)) << commitAfter(']') }
+  //                      │
+  //                      └ matches `JValue` objects separated by `,` zero or more times and 
+  //                        returns the matched `JValue`s inside a `Vector`
 
   val jObjectKey = PS { whitespaces >> quoted() << whitespaces }
 
   def jObjectEntry : Parser[(String, JValue)] =
-    P { lift(jObjectKey << ":"!, jValue) }
+    P { lift(jObjectKey << commitAfter(":"), jValue) }
   //     │
   //     └ combines two parsers `jObjectKey << ":"` and `jValue` and produce a parser that returns a 
   //       tuple containing the parsed key string and `JValue` object.
 
   def jObject : Parser[JValue] = P {
-    ('{'!) >> 
+    '{' >>!
     (jObjectEntry sepBy ',').map(c => JObject(c.toMap))
-    << ('}'!) 
+    << commitAfter('}') 
   }
 
   def jValue : Parser[JValue] = P {
@@ -565,7 +565,7 @@ class ParserTest {
 
     "blah" ~^ """
       0: '{'
-      0: <jObject> := '{'! >> (<jObjectEntry> sepBy ',') << '}'!
+      0: <jObject> := '{' >> !(<jObjectEntry> sepBy ',') << '}'!
       0: <jValue> := <whitespaces> >> (<jNull> | <jBoolean> | <jNumber> | <jString> | <jArray> | <jObject>) << <whitespaces>
     """
     
@@ -576,7 +576,7 @@ class ParserTest {
     }
     """ ~^ """
       55: '}'
-      5: <jObject> := '{'! >> (<jObjectEntry> sepBy ',') << '}'!
+      5: <jObject> := '{' >> !(<jObjectEntry> sepBy ',') << '}'!
       0: <jValue> := <whitespaces> >> (<jNull> | <jBoolean> | <jNumber> | <jString> | <jArray> | <jObject>) << <whitespaces>
     """
   }

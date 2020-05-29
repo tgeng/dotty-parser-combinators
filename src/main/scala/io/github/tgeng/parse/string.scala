@@ -88,9 +88,9 @@ object string {
       )
     ) : Parser[String] = {
     val allEscapedMapping = additionalEscapeMapping + (quoteSymbol -> quoteSymbol) + (escapeSymbol -> escapeSymbol)
-    val literal = charSatisfy(c => !allEscapedMapping.values.toSet(c))
-    val special = escapeSymbol >> !charSatisfy(allEscapedMapping.keySet).map(allEscapedMapping)
+    val literal = charSatisfy(c => !(allEscapedMapping.values.toSet(c)))
+    val special = escapeSymbol >> commitBefore(charSatisfy(allEscapedMapping.keySet).map(allEscapedMapping))
 
-    (quoteSymbol!) >> ((literal|special)*).map(_.mkString("")) << (quoteSymbol!) withStrongName s"<$quoteSymbol-quoted>"
+    quoteSymbol >>! ((literal|special)*).map(_.mkString("")) << commitAfter(quoteSymbol) withStrongName s"<$quoteSymbol-quoted>"
   } 
 }

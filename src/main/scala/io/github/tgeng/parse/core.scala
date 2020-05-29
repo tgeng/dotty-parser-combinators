@@ -229,8 +229,8 @@ def encapsulated[I, T](p: ParserT[I, T]) = new ParserT[I, T] {
 
 private val commitToKind = Kind(10, "!", false)
 
-/** Commit to the right of this parser. See doc of [[|]] for details. */
-def [I, T](p: ParserT[I, T])unary_! = new ParserT[I, T] {
+/** Commit to the left of this parser. See doc of [[|]] for details. */
+def commitBefore[I, T](p: ParserT[I, T]) = new ParserT[I, T] {
   override def kind : Kind = commitToKind
   override def detailImpl = "!" + p.name(kind)
   override def parseImpl(input: ParserState[I]) : Either[ParserError[I], T] = {
@@ -239,8 +239,8 @@ def [I, T](p: ParserT[I, T])unary_! = new ParserT[I, T] {
   }
 }
 
-/** Commit to the left of this parser. See doc of [[|]] for details. */
-def [I, T](p: ParserT[I, T])! = new ParserT[I, T] {
+/** Commit to the right of this parser. See doc of [[|]] for details. */
+def commitAfter[I, T](p: ParserT[I, T]) = new ParserT[I, T] {
   override def kind : Kind = commitToKind
   override def detailImpl = p.name(kind) + "!"
   override def parseImpl(input: ParserState[I]) : Either[ParserError[I], T] = {

@@ -72,71 +72,71 @@ enum JValue {
 Below is a simple parser that converts a JSON string to a `JValue`.
 
 ```scala
-//          ┌ a macro that names the parser according to the enclosing definition, For example, in
-//          | this case, the created parser is named "<jNull>". `S` in `PS` is for strong name,
-//          | which means the `jNull` parser will not report its internals in an error message. TO
-//          | allow reporting internals, use `P` instead, as shown below with `jArray`, `jObject`,
-//          | and `jObjectEntry`.
-//          |
-//          |         ┌────── as ─────┐
-//          |  ┌────  >> ────┐        │
-val jNull = PS { ('n'!) >> "ull" as JNull }
-//              │  │        │           │
-//              │  │        │           └ give it a intuitive name so the error message is
-//              │  │        │             easier to understand
-//              │  │        │
-//              │  │        └ convert the string parser returning "ull" to a parser returning
-//              │  │          `JNull`
-//              │  │
-//              │  └ throw away result from the first parser, which matches 'n', and return
-//              │    the result of the second parser, which, in this case, returns "ull"
-//              │
-//              └ commit right after seeing 'n' to speed up parsing failure in case 'n' is 
-//                followed by things other than "ull". Without committing, the parser would keep 
-//                trying <jBoolean>, <jNumber>, and so on.
+  //          ┌ a macro that names the parser according to the enclosing definition, For example, in
+  //          | this case, the created parser is named "<jNull>". `S` in `PS` is for strong name,
+  //          | which means the `jNull` parser will not report its internals in an error message. TO
+  //          | allow reporting internals, use `P` instead, as shown below with `jArray`, `jObject`,
+  //          | and `jObjectEntry`.
+  //          |
+  //          |         ┌───── as ────┐
+  //          |  ┌───  >> ───┐        │
+  val jNull = PS { 'n' >>! "ull" as JNull }
+  //                    │        │    │
+  //                    │        │    └ give it a intuitive name so the error message is
+  //                    │        │      easier to understand
+  //                    │        │
+  //                    │        └ convert the string parser returning "ull" to a parser returning
+  //                    │          `JNull`
+  //                    │
+  //                    └ throw away result from the first parser, which matches 'n', and return
+  //                      the result of the second parser, which, in this case, returns "ull". In
+  //                      addition, commit right after seeing 'n' to speed up parsing failure in
+  //                      case 'n' is followed by things other than "ull". Without committing, the
+  //                      parser would keep trying <jBoolean>, <jNumber>, and so on.
+  //                
+  //                
 
-//                     ┌ one can also commit right before a parser
-//                     │                          
-//                     │                         ┌ if matching "true" fails, try the following
-//                     │                         │ to match false
-//                     │                         │
-def jBoolean = ('t' >> !"rue" as JBoolean(true)) | 
-               ('f' >> !"alse" as JBoolean(false)) withName "<jBoolean>"
-//                                                 |
-//                                                 └ one could name the parser explicitly like so
-//                                                   without the `P` macro as well
+  //                                               ┌ if matching "true" fails, try the following
+  //                                               │ to match false
+  //                                               │
+  def jBoolean = ('t' >>! "rue" as JBoolean(true)) | 
+                 ('f' >>! "alse" as JBoolean(false)) withName "<jBoolean>"
+  //                                                 |
+  //                                                 └ one could name the parser explicitly like so
+  //                                                   without the `P` macro as well
 
-val jNumber = PS { double.map(JNumber(_))! }
-//                        │
-//                        └ similar to `as`, but it consumes the result from the double parser
+  val jNumber = PS { commitAfter(double.map(JNumber(_))) }
+  //                                     │
+  //                                     └ similar to `as`, but it consumes the result from the 
+  //                                       double parser
 
-def jString = PS { quoted().map(JString(_)) }
+  def jString = PS { quoted().map(JString(_)) }
 
-def jArray : Parser[JValue] = 
-  P { ('['!) >> (jValue sepBy ',').map(JArray(_)) << (']'!) }
-//                        │
-//                        └ matches `JValue` objects separated by `,` zero or more times and 
-//                          returns the matched `JValue`s inside a `Vector`
+  def jArray : Parser[JValue] = 
+    P { '[' >>! (jValue sepBy ',').map(JArray(_)) << commitAfter(']') }
+  //                      │
+  //                      └ matches `JValue` objects separated by `,` zero or more times and 
+  //                        returns the matched `JValue`s inside a `Vector`
 
-val jObjectKey = PS { whitespaces >> quoted() << whitespaces }
+  val jObjectKey = PS { whitespaces >> quoted() << whitespaces }
 
-def jObjectEntry : Parser[(String, JValue)] =
-  P { lift(jObjectKey << ":"!, jValue) }
-//     │
-//     └ combines two parsers `jObjectKey << ":"` and `jValue` and produce a parser that returns a 
-//       tuple containing the parsed key string and `JValue` object.
+  def jObjectEntry : Parser[(String, JValue)] =
+    P { lift(jObjectKey << commitAfter(":"), jValue) }
+  //     │
+  //     └ combines two parsers `jObjectKey << ":"` and `jValue` and produce a parser that returns a 
+  //       tuple containing the parsed key string and `JValue` object.
 
-def jObject : Parser[JValue] = P {
-  ('{'!) >> 
-  (jObjectEntry sepBy ',').map(c => JObject(c.toMap))
-  << ('}'!) 
-}
+  def jObject : Parser[JValue] = P {
+    '{' >>!
+    (jObjectEntry sepBy ',').map(c => JObject(c.toMap))
+    << commitAfter('}') 
+  }
 
-def jValue : Parser[JValue] = P {
-  whitespaces >> 
-  (jNull | jBoolean | jNumber | jString | jArray | jObject) 
-  << whitespaces
-}
+  def jValue : Parser[JValue] = P {
+    whitespaces >> 
+    (jNull | jBoolean | jNumber | jString | jArray | jObject) 
+    << whitespaces
+  }
 
 jValue.parse("""[1, "a", {}]""") // JArray([JNumber(1), JString("a"), JObject({})])
 ```

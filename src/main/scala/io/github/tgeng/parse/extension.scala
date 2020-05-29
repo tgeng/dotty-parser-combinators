@@ -35,6 +35,9 @@ def [I, T](p1: ParserT[I, ?]) >> (p2: ParserT[I, T]) : ParserT[I, T] = (for {
   p1.name(prefixSuffixKind) + " >> " + p2.name(prefixSuffixKind),
   prefixSuffixKind)
 
+/** Matches [[p1]] and commit, then match [[p2]] and outputs result of [[p2]]. */
+def [I, T](p1: ParserT[I, ?]) >>! (p2: ParserT[I, T]) : ParserT[I, T] = p1 >> commitBefore(p2)
+
 /** Matches [[p1]] and [[p2]] and outputs result of [[p1]]. */
 def [I, T](p1: ParserT[I, T]) << (p2: ParserT[I, ?]) : ParserT[I, T] = (for {
   t <- p1
@@ -42,6 +45,9 @@ def [I, T](p1: ParserT[I, T]) << (p2: ParserT[I, ?]) : ParserT[I, T] = (for {
 } yield t) withDetailAndKind (
   p1.name(prefixSuffixKind) + " << " + p2.name(prefixSuffixKind),
   prefixSuffixKind)
+
+/** Matches [[p1]] and commit, then match [[p2]] and outputs result of [[p1]]. */
+def [I, T](p1: ParserT[I, T]) <<! (p2: ParserT[I, ?]) : ParserT[I, T] = p1 << commitBefore(p2)
 
 /** Repeats the parser one or more times and return all matches in a [[Vector]]. */
 def [I, T](p: ParserT[I, T])+ : ParserT[I, Vector[T]] = {
