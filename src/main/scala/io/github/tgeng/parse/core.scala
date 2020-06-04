@@ -81,7 +81,7 @@ trait ParserT[-I, +T] {
   * 
   * @tparam I the type of the input
   */
-class ParserState[+I](val content: IndexedSeq[I], var position: Int, var commitPosition: Int)
+class ParserState[+I](val content: IndexedSeq[I], var position: Int = 0, var commitPosition: Int = 0)
 
 case class ParserError[-I](
   val position: Int,
@@ -399,6 +399,25 @@ val position = new ParserT[Any, Int] {
   override def parseImpl(input: ParserState[Any]) = Right(input.position)
 }
 
+val lineColumn = new ParserT[Char, (Int, Int)] {
+  override def kind : Kind = positionKind
+  override def detailImpl = "<lineColumn>"
+  override def parseImpl(input: ParserState[Char]) = {
+    var line = 0
+    var column = 0
+    for (i <- 0 until scala.math.min(input.position, input.content.size)) {
+      column += 1
+      if (input.content(i) == '\n') {
+        line += 1
+      }
+      if (input.content(i) == '\n' || input.content(i) == '\r') {
+        column = 0
+      }
+    }
+    Right(line, column)
+  }
+}
+
 private val predicateKind = Kind(10, "satisfy", true)
 
 /** Simple parser that succeeds if the current parser input matches the given 
@@ -448,7 +467,7 @@ def fail[I, T](msg: String) = new ParserT[I, T] {
 def [I, T](p: ParserT[I, T]) satisfying(predicate: T => Boolean, predicateName: String = "some custom predicate") = new ParserT[I, T] {
     override def kind : Kind = p.kind
     override def detailImpl = p.detailImpl + " satisfying " + predicateName
-    override def parseImpl(input: ParserState[I]) : Either[ParserError[I] | Null, T] =
+    override def parseImpl(input: ParserState[I]) : Either[ParserError[I] | Null, T] = {
       val position = input.position
       p.parse(input).flatMap{ t =>
         predicate(t) match {
@@ -456,6 +475,23 @@ def [I, T](p: ParserT[I, T]) satisfying(predicate: T => Boolean, predicateName: 
           case false => Left(null)
         }
       }
+    }
+}
+
+private val peekKind = Kind(10, "peek", true)
+
+def peek[I](offset: Int) : ParserT[I, I] = new ParserT[I, I] {
+  private var lastPeekLocation : Int = -1
+  override def kind : Kind = peekKind
+  override def detailImpl = s"<peek@${if (lastPeekLocation == -1) "?" else lastPeekLocation}>"
+  override def parseImpl(input: ParserState[I]) : Either[ParserError[I] | Null, I] = {
+    val peekPosition = input.position + offset
+    if (peekPosition >= 0 || peekPosition < input.content.size) {
+      Right(input.content(peekPosition))
+    } else {
+      Left(null)
+    }
+  }
 }
 
 /** Facilitates implicit conversion. In addition, name the parser with the
@@ -477,12 +513,14 @@ inline def PS[I, T](inline parser: => ParserT[I, T]) : ParserT[I, T] =
   parser withStrongName "<" + enclosingName(parser) + ">"
 
 
+/** Gets the name of the enclosing declaration. */
 private inline def enclosingName(inline e: Any): String = ${
   enclosingNameImpl('e)
 }
 
 import scala.quoted._
 
+/** Gets the name of the enclosing declaration. */
 private def enclosingNameImpl(e: Expr[Any])(using qctx: QuoteContext): Expr[String] = {
   import qctx.tasty._
   val name = rootContext.owner.owner.name

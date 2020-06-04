@@ -63,9 +63,11 @@ object string {
   val whitespace : Parser[Char] = PS { satisfy(Character.isWhitespace) }
   val whitespaces : Parser[String] = PS { (whitespace*).map(_.mkString("")) }
 
-  val lf : Parser[Char] = PS { charSatisfy(_ == '\n') }
-  val cr : Parser[Char] = PS { charSatisfy(_ == '\r') }
-  val crlf : Parser[String] = PS { cr >> lf as "\r\n" }
+  val lf : Parser[Char] = PS { '\n' }
+  val cr : Parser[Char] = PS { '\r' }
+  val crlf : Parser[String] = PS { "\r\n" }
+  val newline : Parser[Unit] = PS { "\r\n" | "\n" as (()) }
+  val blankLine : Parser[Unit] = PS { "[^\\S\n]*\n".rp as (()) }
 
   val upper : Parser[Char] = PS { satisfy(Character.isUpperCase) }
   val lower : Parser[Char] = PS { satisfy(Character.isLowerCase) }

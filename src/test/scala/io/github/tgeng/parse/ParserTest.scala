@@ -61,6 +61,37 @@ class ParserTest {
   }
 
   @Test
+  def `test lineColumn` = {
+    testing(lineColumn) {
+      "" ~> (0, 0)
+      "abc" ~> (0, 0)
+      "\n" ~> (0, 0)
+    }
+
+    testing(whitespaces >> lineColumn) {
+      "" ~> (0, 0)
+      "  " ~> (0, 2)
+      "     " ~> (0, 5)
+      "\n" ~> (1, 0)
+      "\n " ~> (1, 1)
+      "\n\n " ~> (2, 1)
+      "\n\r\n\n  " ~> (3, 2)
+      "\n  \n " ~> (2, 1)
+      "\r\n  \r\n " ~> (2, 1)
+    }
+  }
+
+  @Test
+  def `test blankLine` = {
+    testing(blankLine.* >> lineColumn) {
+      " " ~> (0, 0)
+      "\n " ~> (1, 0)
+      "  \n " ~> (1, 0)
+      "  \n  \n " ~> (2, 0)
+    }
+  }
+
+  @Test
   def `for comprehension` = {
     val ab = P {
       for {
@@ -391,6 +422,10 @@ class ParserTest {
     }
     testing(crlf) {
       "\r\n" ~> "\r\n"
+    }
+    testing(newline) {
+      "\r\n" ~> (())
+      "\n" ~> (())
     }
 
     testing(upper) {
