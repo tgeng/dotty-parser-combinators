@@ -501,7 +501,7 @@ class ParserTest {
   }
 
   @Test 
-  def `test satisfying` = testing(".*".rp.satisfying(_ == "foo")) {
+  def `test withFilter` = testing(".*".rp.withFilter(_ == "foo")) {
     "foo" ~> "foo"
     "foobar" ~^ """
       0: /.*/ satisfying some custom predicate

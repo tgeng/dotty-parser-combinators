@@ -464,7 +464,7 @@ def fail[I, T](msg: String) = new ParserT[I, T] {
 /** Augment the given parser with additional predicate testing the parsed 
  * result. If the result fails the predicate, the returned parser fails parsing.
  */
-def [I, T](p: ParserT[I, T]) satisfying(predicate: T => Boolean, predicateName: String = "some custom predicate") = new ParserT[I, T] {
+def [I, T](p: ParserT[I, T]) withFilter(predicate: T => Boolean, predicateName: String = "some custom predicate") = new ParserT[I, T] {
     override def kind : Kind = p.kind
     override def detailImpl = p.detailImpl + " satisfying " + predicateName
     override def parseImpl(input: ParserState[I]) : Either[ParserError[I] | Null, T] = {
