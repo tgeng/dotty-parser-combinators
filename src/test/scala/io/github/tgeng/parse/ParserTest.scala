@@ -25,38 +25,66 @@ class ParserTest {
     }
     testing(any) {
       "abc" ~> 'a'
-      "" ~^ "0: <any>"
+      "" ~^ """
+        |
+        |^
+        |0: <any>
+      """
     }
     testing(eof) {
       "" ~> (())
-      "abc" ~^ "0: <eof>"
+      "abc" ~^ """
+        |abc
+        |^
+        |0: <eof>
+      """
     }
     testing(skip) {
       "abc" ~> (())
-      "" ~^ "0: <skip>"
+      "" ~^ """
+        |
+        |^
+        |0: <skip>
+      """
     }
 
     testing(anyOf("abc")) {
       "ccc" ~> 'c'
-      "" ~^ "0: <anyOf{a, b, c}>"
+      "" ~^ """
+        |
+        |^
+        |0: <anyOf{a, b, c}>
+      """
     }
 
     testing('c') {
       "c" ~> 'c'
       "change" ~> 'c'
-      "abc" ~^ "0: 'c'"
+      "abc" ~^ """
+        |abc
+        |^
+        |0: 'c'
+      """
     }
 
     testing("abc") {
       "abc" ~> "abc"
       "abcdef" ~> "abc"
-      "def" ~^ """0: "abc""""
+      "def" ~^ """
+        |def
+        |^
+        |0: "abc"
+      """
     }
 
     testing("[0-9]+".rp) {
       "123" ~> "123"
       "123abc" ~> "123"
-      "abc" ~^ """0: /[0-9]+/"""
+      "abc" ~^ """
+        |abc
+        |^
+        |0: /[0-9]+/
+      """
     }
   }
 
@@ -82,6 +110,18 @@ class ParserTest {
   }
 
   @Test
+  def `test column` = {
+    testing(whitespaces >> column) {
+      "" ~> 0
+      "abc" ~> 0
+      "  a" ~> 2
+      "\n" ~> 0
+      "\n " ~> 1
+      "\r\n  " ~> 2
+    }
+  }
+
+  @Test
   def `test blankLine` = {
     testing(blankLine.* >> lineColumn) {
       " " ~> (0, 0)
@@ -103,8 +143,10 @@ class ParserTest {
     testing(ab) {
       "ab" ~> "ab"
       "a" ~^ """
-        1: "b"
-        0: <ab> := "a" "b"
+        |a
+        | ^
+        |1: "b"
+        |0: <ab> := "a" "b"
       """
     }
   }
@@ -115,8 +157,10 @@ class ParserTest {
       "a" ~> "a"
       "b" ~> "b"
       "x" ~^ """
-        0: "d"
-        0: "a" | "b" | "c" | "d"
+        |x
+        |^
+        |0: "d"
+        |0: "a" | "b" | "c" | "d"
       """
     }
   }
@@ -131,9 +175,11 @@ class ParserTest {
       "0xaaf" ~> "aaf"
       "0123" ~> "123"
       "0abc" ~^ """
-        1: /[0-7]+/
-        0: oct := "0" >> !/[0-7]+/
-        0: hex | oct | /.*/
+        |0abc
+        | ^
+        |1: /[0-7]+/
+        |0: oct := "0" >> !/[0-7]+/
+        |0: hex | oct | /.*/
       """
     }
   }
@@ -158,8 +204,10 @@ class ParserTest {
       "class" ~> "class"
       "val" ~> "val"
       "definition" ~^ """
-        3: not <satisfy>
-        0: ("def" | "class" | "val") << not <satisfy>
+        |definition
+        |   ^
+        |3: not <satisfy>
+        |0: ("def" | "class" | "val") << not <satisfy>
       """
     }
   }
@@ -175,12 +223,16 @@ class ParserTest {
       "abc" ~> "abc"
       "definition" ~> "definition"
       "def" ~^ """
-        0: not keyword
-        0: /\w+/ & not keyword & not digit
+        |def
+        |^
+        |0: not keyword
+        |0: /\w+/ & not keyword & not digit
       """
       "123abc" ~^ """
-        0: not digit
-        0: /\w+/ & not keyword & not digit
+        |123abc
+        |^
+        |0: not digit
+        |0: /\w+/ & not keyword & not digit
       """
     }
   }
@@ -195,8 +247,10 @@ class ParserTest {
     testing(abc+) {
       "abcabcabd" ~> Seq("abc", "abc" )
       "def" ~^ """
-        0: "abc"
-        0: "abc"+
+        |def
+        |^
+        |0: "abc"
+        |0: "abc"+
       """
     }
     testing(abc?) {
@@ -211,8 +265,10 @@ class ParserTest {
       "abcabcabc" ~> Seq("abc", "abc", "abc" )
       "abcabcabcabc" ~> Seq("abc", "abc", "abc" )
       "abcabc" ~^ """
-        6: "abc"
-        0: 3 * "abc"
+        |abcabc
+        |      ^
+        |6: "abc"
+        |0: 3 * "abc"
       """
     }
   }
@@ -224,9 +280,11 @@ class ParserTest {
       "abc" ~> Seq("abc" )
       "abc,def" ~> Seq("abc", "def" )
       "~~" ~^ """
-        0: /\w+/
-        0: word := /\w+/
-        0: word sepBy1 ','
+        |~~
+        |^
+        |0: /\w+/
+        |0: word := /\w+/
+        |0: word sepBy1 ','
       """
     }
     testing(word sepBy ',') {
@@ -238,8 +296,10 @@ class ParserTest {
       "ab,cd,ef" ~> Seq("ab", "cd", "ef" )
       "ab,cd,ef,gh" ~> Seq("ab", "cd", "ef" )
       "ab,cd" ~^ """
-        5: ','
-        0: word sepByN(3) ','
+        |ab,cd
+        |     ^
+        |5: ','
+        |0: word sepByN(3) ','
       """
     }
   }
@@ -251,13 +311,17 @@ class ParserTest {
     "(abc)" ~> "abc"
     "(abc)def" ~> "abc"
     "()" ~^ """
-      1: /\w+/
-      1: word := /\w+/
-      0: '(' >> word << ')'
+      |()
+      | ^
+      |1: /\w+/
+      |1: word := /\w+/
+      |0: '(' >> word << ')'
     """
     "abc" ~^ """
-      0: '('
-      0: '(' >> word << ')'
+      |abc
+      |^
+      |0: '('
+      |0: '(' >> word << ')'
     """
     }
   }
@@ -269,26 +333,32 @@ class ParserTest {
     testing(pure((a: Int, b: Int) => a + b, "Sum2") <*> (number, number)) {
       "12 34" ~> 46
       "12 ab" ~^ """
-        3: /[0-9]+/
-        3: number := /[0-9]+/ << ' '*
-        0: Sum2 <*> (number, number)
+        |12 ab
+        |   ^
+        |3: /[0-9]+/
+        |3: number := /[0-9]+/ << ' '*
+        |0: Sum2 <*> (number, number)
       """
     }
     testing(pure((a: Int, b: Int, c: Int) => a + b + c, "Sum3") <*> (number, number, number)) {
       "12 34 56" ~> 102
       "12 34" ~^ """
-        5: /[0-9]+/
-        5: number := /[0-9]+/ << ' '*
-        0: Sum3 <*> (number, number, number)
+        |12 34
+        |     ^
+        |5: /[0-9]+/
+        |5: number := /[0-9]+/ << ' '*
+        |0: Sum3 <*> (number, number, number)
       """
     }
     testing(pure((a: Int, b: Int, c: Int, d: Int) => a + b + c + d, "Sum4") <*> (number, number, number, number)) {
-    "12 34 56 78" ~> 180
-    "12 34 56 " ~^ """
-      9: /[0-9]+/
-      9: number := /[0-9]+/ << ' '*
-      0: Sum4 <*> (number, number, number, number)
-    """
+      "12 34 56 78" ~> 180
+      "12 34 56 " ~^ """
+        |12 34 56 
+        |         ^
+        |9: /[0-9]+/
+        |9: number := /[0-9]+/ << ' '*
+        |0: Sum4 <*> (number, number, number, number)
+      """
     }
   }
 
@@ -312,30 +382,38 @@ class ParserTest {
     testing(a +:+ b) {
       "abc".~>[IndexedSeq[Char]]("ab")
       "a" ~^ """
-        1: 'b'
-        0: 'a' +:+ 'b'
+        |a
+        | ^
+        |1: 'b'
+        |0: 'a' +:+ 'b'
       """
     }
     val ab = a +:+ b
     testing(c +: ab) {
       "cab".~>[IndexedSeq[Char]]("cab")
       "ab" ~^ """
-        0: 'c'
-        0: 'c' +: 'a' +:+ 'b'
+        |ab
+        |^
+        |0: 'c'
+        |0: 'c' +: 'a' +:+ 'b'
       """
     }
     testing(ab :+ c) {
       "abc".~>[IndexedSeq[Char]]("abc")
       "abd" ~^ """
-        2: 'c'
-        0: 'a' +:+ 'b' :+ 'c'
+        |abd
+        |  ^
+        |2: 'c'
+        |0: 'a' +:+ 'b' :+ 'c'
       """
     }
     testing(ab ++ ab) {
       "abab".~>[IndexedSeq[Char]]("abab")
       "abc" ~^ """
-        2: 'a'
-        0: 'a' +:+ 'b' ++ 'a' +:+ 'b'
+        |abc
+        |  ^
+        |2: 'a'
+        |0: 'a' +:+ 'b' ++ 'a' +:+ 'b'
       """
     }
   }
@@ -346,8 +424,10 @@ class ParserTest {
     testing(abParser) {
       "ab" ~> Vector("a", "b")
       "cd" ~^ """
-        0: "a"
-        0: lift{"a", "b"}
+        |cd
+        |^
+        |0: "a"
+        |0: lift{"a", "b"}
       """
     }
 
@@ -355,8 +435,10 @@ class ParserTest {
     testing(abcParser) {
       "abc" ~> ("a", "b", "c")
       "abd" ~^ """
-        2: "c"
-        0: ("a", "b", "c")
+        |abd
+        |  ^
+        |2: "c"
+        |0: ("a", "b", "c")
       """
     }
   }
@@ -410,8 +492,8 @@ class ParserTest {
       "\t" ~> '\t'
     }
     testing(whitespaces) {
-      " \t \n" ~> " \t \n"
-      "" ~> ""
+      " \t \n" ~> (())
+      "" ~> (())
     }
 
     testing(lf) {
@@ -430,15 +512,27 @@ class ParserTest {
 
     testing(upper) {
       "A" ~> 'A'
-      "a" ~^ "0: <upper>"
+      "a" ~^ """
+        |a
+        |^
+        |0: <upper>
+      """
     }
     testing(lower) {
       "a" ~> 'a'
-      "A" ~^ "0: <lower>"
+      "A" ~^ """
+        |A
+        |^
+        |0: <lower>
+      """
     }
     testing(digit) {
       "7" ~> '7'
-      "a" ~^ "0: <digit>"
+      "a" ~^ """
+        |a
+        |^
+        |0: <digit>
+      """
     }
     testing(alphaNum) {
       "a" ~> 'a'
@@ -450,7 +544,11 @@ class ParserTest {
       "123" ~> 123
       "+12" ~> 12
       "-23" ~> -23
-      "abc" ~^ "0: <int>"
+      "abc" ~^ """
+        |abc
+        |^
+        |0: <int>
+      """
     }
     testing(double) {
       "+2" ~> 2.0
@@ -461,9 +559,42 @@ class ParserTest {
       "4." ~> 4.0
       ".5" ~> 0.5
       "abc" ~^  """
-        0: <double>
+        |abc
+        |^
+        |0: <double>
       """
     }
+  }
+
+  @Test
+  def `test indented` = testing(withIndent(2) { whitespaces >> lineColumn }) {
+    "" ~> (0, 0)
+    " " ~> (0, 1)
+    " \n" ~> (0, 1)
+    " \n " ~> (0, 1)
+    " \n  " ~> (1, 2)
+    " \n\n  " ~> (2, 2)
+    "     \n \n  " ~> (2, 2)
+  }
+
+  @Test
+  def `test aligned` = testing(aligned{"do " >> ("\\w+".rp sepBy1 (someLines << spaces))}) {
+    """do foo
+      |bar
+      |quux
+    """.stripMargin ~> Seq("foo", "bar", "quux")
+
+    """  do foo
+      |  bar
+      |  quux
+      |next
+    """.stripMargin ~> Seq("foo", "bar", "quux")
+
+    """  do foo
+      |     bar
+      |     quux
+      |next
+    """.stripMargin ~> Seq("foo", "bar", "quux")
   }
 
   @Test
@@ -472,22 +603,30 @@ class ParserTest {
     "'$t'" ~> "\t"
     "'$'quoted$$string$''" ~> "'quoted$string'"
     "abc" ~^ """
-      0: <'-quoted>
+      |abc
+      |^
+      |0: <'-quoted>
     """
     "'abc" ~^ """
-      0: <'-quoted>
+      |'abc
+      |^
+      |0: <'-quoted>
     """
   }
 
   @Test
   def `test fail` = testing(fail("blah")) {
     "" ~^ """
-      blah
-      0: <failure>
+      |
+      |^
+      |blah
+      |0: <failure>
     """
     "yoo" ~^ """
-      blah
-      0: <failure>
+      |yoo
+      |^
+      |blah
+      |0: <failure>
     """
   }
 
@@ -495,8 +634,10 @@ class ParserTest {
   def `test withErrorMessage` = testing("abc".rp.withErrorMessage("should match 'abc'")) {
     "abc" ~> "abc"
     "def" ~^ """
-      should match 'abc'
-      0: /abc/
+      |def
+      |^
+      |should match 'abc'
+      |0: /abc/
     """
   }
 
@@ -504,7 +645,9 @@ class ParserTest {
   def `test withFilter` = testing(".*".rp.withFilter(_ == "foo")) {
     "foo" ~> "foo"
     "foobar" ~^ """
-      0: /.*/ satisfying some custom predicate
+      |foobar
+      |^
+      |0: /.*/ satisfying some custom predicate
     """
   }
 
@@ -599,9 +742,11 @@ class ParserTest {
       ))
 
     "blah" ~^ """
-      0: '{'
-      0: <jObject> := '{' >> !(<jObjectEntry> sepBy ',') << '}'!
-      0: <jValue> := <whitespaces> >> (<jNull> | <jBoolean> | <jNumber> | <jString> | <jArray> | <jObject>) << <whitespaces>
+      |blah
+      |^
+      |0: '{'
+      |0: <jObject> := '{' >> !(<jObjectEntry> sepBy ',') << '}'!
+      |0: <jValue> := <whitespaces> >> (<jNull> | <jBoolean> | <jNumber> | <jString> | <jArray> | <jObject>) << <whitespaces>
     """
     
     """
@@ -610,9 +755,11 @@ class ParserTest {
       "bar": "blah"
     }
     """ ~^ """
-      55: '}'
-      5: <jObject> := '{' >> !(<jObjectEntry> sepBy ',') << '}'!
-      0: <jValue> := <whitespaces> >> (<jNull> | <jBoolean> | <jNumber> | <jString> | <jArray> | <jObject>) << <whitespaces>
+      |      "bar": "blah"
+      |      ^
+      |55: '}'
+      |5: <jObject> := '{' >> !(<jObjectEntry> sepBy ',') << '}'!
+      |0: <jValue> := <whitespaces> >> (<jNull> | <jBoolean> | <jNumber> | <jString> | <jArray> | <jObject>) << <whitespaces>
     """
   }
 }
@@ -626,9 +773,10 @@ enum JValue {
   case JObject(value: Map[String, JValue])
 }     
 
-private def testing[I, T](parser: ParserT[I, T])(block: ParserT[I, T] ?=> Unit) = {
+private def testing[T](parser: string.Parser[T])(block: string.Parser[T] ?=> Unit) = {
   block(using parser)
 }
+import io.github.tgeng.parse.string.toStringWithInput
 
 private def [T](input: String) ~> (expected: T)(using parser: string.Parser[T]) = {
   parser.parse(input) match {
@@ -640,24 +788,30 @@ private def [T](input: String) ~> (expected: T)(using parser: string.Parser[T]) 
         actual.toString.indented(2) + "\n"
         )
     }
-    case Left(e) => fail(
-      getFailMessagePrefix(parser, input) + "expect output to be\n  " +
-        expected.toString.indented(2) + "\nbut parsing fails with message\n  " +
-        e.toString.indented(2) + "\n"
-    )
+    case Left(e) => {
+      val actual = e.toStringWithInput(input)
+      fail(
+        getFailMessagePrefix(parser, input) + "expect output to be\n  " +
+          expected.toString.indented(2) + "\nbut parsing fails with message\n  " +
+          actual.indented(2) + "\n"
+      )
+    }
   }
 }
 
 private def [T](input: String) ~^ (errorMessage: String)(using parser: string.Parser[T]) = {
   val t = parser.parse(input)
-  val trimmedMessage = errorMessage.trim.replaceAll("\n +", "\n")
+  val trimmedMessage = errorMessage.trim.asInstanceOf[String].stripMargin
   t match {
      case Right(t) => fail(getFailMessagePrefix(parser, input) +
        s"expect parsing to fail but it succeeds with\n  ${t.toString.indented(2)}\n")
-     case Left(e) => e.toString() == trimmedMessage match {
-       case false => fail(getFailMessagePrefix(parser, input) +
-         s"expect parsing to fail with message\n  ${trimmedMessage.indented(2)}\nbut it fails with message\n  ${e.toString().indented(2)}\n")
-       case _ => ()
+     case Left(e) => {
+       val actual = e.toStringWithInput(input)
+       actual == trimmedMessage match {
+         case false => fail(getFailMessagePrefix(parser, input) +
+           s"expect parsing to fail with message\n  ${trimmedMessage.indented(2)}\nbut it fails with message\n  ${actual.indented(2)}\n")
+         case _ => ()
+       }
      }
   }
 }

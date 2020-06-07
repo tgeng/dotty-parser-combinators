@@ -399,25 +399,6 @@ val position = new ParserT[Any, Int] {
   override def parseImpl(input: ParserState[Any]) = Right(input.position)
 }
 
-val lineColumn = new ParserT[Char, (Int, Int)] {
-  override def kind : Kind = positionKind
-  override def detailImpl = "<lineColumn>"
-  override def parseImpl(input: ParserState[Char]) = {
-    var line = 0
-    var column = 0
-    for (i <- 0 until scala.math.min(input.position, input.content.size)) {
-      column += 1
-      if (input.content(i) == '\n') {
-        line += 1
-      }
-      if (input.content(i) == '\n' || input.content(i) == '\r') {
-        column = 0
-      }
-    }
-    Right(line, column)
-  }
-}
-
 private val predicateKind = Kind(10, "satisfy", true)
 
 /** Simple parser that succeeds if the current parser input matches the given 

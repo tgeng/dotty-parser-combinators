@@ -6,6 +6,39 @@ import scala.util.matching.Regex.Match
 
 object string {
 
+  private def lineColumnKind = Kind(10, "lineColumn", true)
+  
+  val lineColumn = new Parser[(Int, Int)] {
+    override def kind : Kind = lineColumnKind
+    override def detailImpl = "<lineColumn>"
+    override def parseImpl(input: ParserState[Char]) = {
+      var line = 0
+      var column = 0
+      for (i <- 0 until scala.math.min(input.position, input.content.size)) {
+        column += 1
+        if (input.content(i) == '\n') {
+          line += 1
+        }
+        if (input.content(i) == '\n' || input.content(i) == '\r') {
+          column = 0
+        }
+      }
+      Right(line, column)
+    }
+  }
+
+  val column = new Parser[Int] {
+    override def kind : Kind = lineColumnKind
+    override def detailImpl = "<column>"
+    override def parseImpl(input: ParserState[Char]) = {
+      var pos = input.position
+      while (pos >= 0 && (pos >= input.content.size || input.content(pos) != '\n')) {
+        pos -= 1
+      }
+      Right(input.position - pos - 1)
+    }
+  }
+
   type Parser[T] = ParserT[Char, T]
 
   private val regexKind = Kind(10, "regex", true)
@@ -60,8 +93,25 @@ object string {
 
   val space : Parser[Char] = PS { charSatisfy(_ == ' ') }
   val spaces : Parser[String] = PS { (space*).map(_.mkString("")) }
+  def someLines(using ir: IndentRequirement) : Parser[Unit] = PS {
+    (spaces >> newline).+ >> (ir.amount * P(' ')) as (())
+  }
   val whitespace : Parser[Char] = PS { satisfy(Character.isWhitespace) }
-  val whitespaces : Parser[String] = PS { (whitespace*).map(_.mkString("")) }
+  def whitespaces(using ir: IndentRequirement) : Parser[Unit] = PS {
+    someLines >> spaces | spaces as (())
+  }
+
+  def withIndent[T](amount: Int)(p: IndentRequirement ?=> Parser[T]) = p(using IndentRequirement(amount))
+
+  def alignedWithIndent[T](amount: Int)(p : IndentRequirement ?=> Parser[T]) : Parser[T] = for {
+    indent <- spaces >> column
+    r <- p(using IndentRequirement(indent + amount))
+  } yield r
+
+  def aligned[T](p: IndentRequirement ?=> Parser[T]) = alignedWithIndent(0)(p)
+
+  case class IndentRequirement(amount: Int)
+  given IndentRequirement = IndentRequirement(0)
 
   val lf : Parser[Char] = PS { '\n' }
   val cr : Parser[Char] = PS { '\r' }
@@ -95,4 +145,18 @@ object string {
 
     quoteSymbol >>! ((literal|special)*).map(_.mkString("")) << commitAfter(quoteSymbol) withStrongName s"<$quoteSymbol-quoted>"
   } 
+
+  def (e: ParserError[Char]) toStringWithInput(input: IndexedSeq[Char]) : String = {
+    var rootCause : ParserError[Char] = e
+    while(rootCause.cause != null) {
+      rootCause = rootCause.cause.asInstanceOf[ParserError[Char]]
+    }
+    var lineStart = input.lastIndexOf('\n', rootCause.position) + 1
+    var lineEnd = input.indexOf('\n', rootCause.position)
+    if (lineEnd == -1) lineEnd = input.length
+    val col = rootCause.position - lineStart
+    s"""${input.subSequence(lineStart, lineEnd)}
+       |${(0 until col).map(_ => ' ').mkString}^
+       |${e.toString}""".stripMargin
+  }
 }
