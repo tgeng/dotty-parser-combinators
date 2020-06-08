@@ -128,6 +128,7 @@ def pure[I, T](t: T, aName : String = "<pure>") = new ParserT[I, T] {
   */
 def [I, T, R](p: ParserT[I, T]) map(f: T => R): ParserT[I, R] = {
   new ParserT[I, R] {
+    override def message = p.message
     override def kind : Kind = p.kind
     override def name(k: Kind) = p.name(k)
     override def detailImpl = p.detailImpl
@@ -186,6 +187,7 @@ def [I, T](p: => ParserT[I, T]) withStrongName(newName: String) : ParserT[I, T] 
 private def [I, T](p: => ParserT[I, T]) withNameAndDetail(newName: String, newDetail: String|Null, strong: Boolean = false) : ParserT[I, T] = new ParserT[I, T] {
   private val namedKind = Kind(10, "named", true)
   private lazy val cachedP : ParserT[I, T] = p
+  override def message = p.message
   override def kind : Kind = namedKind
   override def name(parentKind: Kind): String = newName
   override def detailImpl = if(newDetail == null) cachedP.name() else newDetail
@@ -207,6 +209,7 @@ def [I, T](p: ParserT[I, T]) withDetailAndKind(newDetail: String, newKind: Kind)
   */
 def [I, T](p: ParserT[I, T]) withDetailFnAndKind(detailTransformer: String => String, newKind : Kind) : ParserT[I, T] = new ParserT[I, T] {
   override def kind : Kind = newKind
+  override def message = p.message
   override def detailImpl = detailTransformer(p.detailImpl)
   override def parseImpl(input: ParserState[I]) : Either[ParserError[I] | Null, T] = p.parse(input)
 }
@@ -446,6 +449,7 @@ def fail[I, T](msg: String) = new ParserT[I, T] {
  * result. If the result fails the predicate, the returned parser fails parsing.
  */
 def [I, T](p: ParserT[I, T]) withFilter(predicate: T => Boolean, predicateName: String = "some custom predicate") = new ParserT[I, T] {
+    override def message = p.message
     override def kind : Kind = p.kind
     override def detailImpl = p.detailImpl + " satisfying " + predicateName
     override def parseImpl(input: ParserState[I]) : Either[ParserError[I] | Null, T] = {
