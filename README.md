@@ -93,13 +93,13 @@ Below is a simple parser that converts a JSON string to a `JValue`.
   //                      addition, commit right after seeing 'n' to speed up parsing failure in
   //                      case 'n' is followed by things other than "ull". Without committing, the
   //                      parser would keep trying <jBoolean>, <jNumber>, and so on.
-  //                
-  //                
+  //
+  //
 
   //                                               ┌ if matching "true" fails, try the following
   //                                               │ to match false
   //                                               │
-  def jBoolean = ('t' >>! "rue" as JBoolean(true)) | 
+  def jBoolean = ('t' >>! "rue" as JBoolean(true)) |
                  ('f' >>! "alse" as JBoolean(false)) withName "<jBoolean>"
   //                                                 |
   //                                                 └ one could name the parser explicitly like so
@@ -107,15 +107,15 @@ Below is a simple parser that converts a JSON string to a `JValue`.
 
   val jNumber = PS { commitAfter(double.map(JNumber(_))) }
   //                                     │
-  //                                     └ similar to `as`, but it consumes the result from the 
+  //                                     └ similar to `as`, but it consumes the result from the
   //                                       double parser
 
   def jString = PS { quoted().map(JString(_)) }
 
-  def jArray : Parser[JValue] = 
+  def jArray : Parser[JValue] =
     P { '[' >>! (jValue sepBy ',').map(JArray(_)) << commitAfter(']') }
   //                      │
-  //                      └ matches `JValue` objects separated by `,` zero or more times and 
+  //                      └ matches `JValue` objects separated by `,` zero or more times and
   //                        returns the matched `JValue`s inside a `Vector`
 
   val jObjectKey = PS { whitespaces >> quoted() << whitespaces }
@@ -123,18 +123,18 @@ Below is a simple parser that converts a JSON string to a `JValue`.
   def jObjectEntry : Parser[(String, JValue)] =
     P { lift(jObjectKey << commitAfter(":"), jValue) }
   //     │
-  //     └ combines two parsers `jObjectKey << ":"` and `jValue` and produce a parser that returns a 
+  //     └ combines two parsers `jObjectKey << ":"` and `jValue` and produce a parser that returns a
   //       tuple containing the parsed key string and `JValue` object.
 
   def jObject : Parser[JValue] = P {
     '{' >>!
     (jObjectEntry sepBy ',').map(c => JObject(c.toMap))
-    << commitAfter('}') 
+    << commitAfter('}')
   }
 
   def jValue : Parser[JValue] = P {
-    whitespaces >> 
-    (jNull | jBoolean | jNumber | jString | jArray | jObject) 
+    whitespaces >>
+    (jNull | jBoolean | jNumber | jString | jArray | jObject)
     << whitespaces
   }
 
@@ -197,4 +197,5 @@ For more examples, please refer to
 | -------- | ------------------------ |
 | 0.23-RC1 | 0.1.0                    |
 | 0.24-RC1 | 0.1.1+                   |
-| 0.24-RC1 | 0.2.*                    |
+| 0.24-RC1 | 0.2.0-8                  |
+| 0.25-RC2 | 0.2.8+                   |
